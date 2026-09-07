@@ -1,0 +1,238 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(uuid())
+  userNumber    Int      @unique @default(autoincrement())
+  name          String?
+  email         String?  @unique
+  phone         String   @unique
+  role          String   @default("CUSTOMER")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+  refreshTokens RefreshToken[]
+  addresses     Address[]
+  orders        Order[]
+  notifications Notification[]
+
+  @@index([phone])
+  @@index([email])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model Address {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  label      String
+  line1      String
+  line2      String?
+  city       String
+  state      String?
+  pincode    String
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  deletedAt  DateTime?
+}
+
+model Category {
+  id          String    @id @default(uuid())
+  name        String
+  slug        String    @unique
+  description String?
+  iconUrl     String?
+  isActive    Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  products  Product[]
+}
+
+model Product {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  sku         String?   @unique
+  categoryId  String
+  category    Category  @relation(fields: [categoryId], references: [id])
+  price       Decimal   @db.Decimal(10, 2)
+  discountedPrice Decimal? @db.Decimal(10, 2)
+  stock       Int       @default(0)
+  reserved    Int       @default(0)
+  images      String[]
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  orderItems  OrderItem[]
+  cartItems   CartItem[]
+
+  @@index([name])
+  @@index([categoryId])
+  @@index([sku])
+}
+
+model StoreSetting {
+  id              String   @id @default(uuid())
+  deliveryCharges Decimal  @db.Decimal(10, 2)
+  tax             Decimal  @db.Decimal(10, 2)
+  minOrderValue   Decimal  @db.Decimal(10, 2) @default(0)
+  minOrderValueEnabled Boolean @default(false)
+  maintenanceMode Boolean  @default(false)
+  appVersion      String
+  storeOpenTime   String
+  storeCloseTime  String
+  paymentMethods  String[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model ServicePincode {
+  id        String   @id @default(uuid())
+  pincode   String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([pincode])
+}
+
+model Cart {
+  id        String     @id @default(uuid())
+  userId    String     @unique
+  items     CartItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model CartItem {
+  id        String   @id @default(uuid())
+  cartId    String
+  cart      Cart     @relation(fields: [cartId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  quantity  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Order {
+  id            String        @id @default(uuid())
+  orderNumber   Int           @unique @default(autoincrement())
+  userId        String
+  user          User          @relation(fields: [userId], references: [id])
+  status        String        @default("PENDING")
+  paymentMethod String
+  total         Decimal       @db.Decimal(10, 2)
+  addressId     String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  items         OrderItem[]
+  payments      Payment[]
+  deliveries    DeliveryAssignment[]
+  notifications Notification[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id        String   @id @default(uuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  quantity  Int
+  price     Decimal  @db.Decimal(10, 2)
+  createdAt DateTime @default(now())
+}
+
+model Payment {
+  id              String   @id @default(uuid())
+  orderId         String
+  order           Order    @relation(fields: [orderId], references: [id])
+  provider        String
+  providerPaymentId String?
+  status          String   @default("PENDING")
+  amount          Decimal  @db.Decimal(10, 2)
+  currency        String   @default("INR")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  webhookEventId  String?  @unique
+}
+
+model Coupon {
+  id                String    @id @default(uuid())
+  code              String    @unique
+  description       String?
+  type              String
+  discount          Decimal   @db.Decimal(10, 2)
+  maxDiscountAmount Decimal?  @db.Decimal(10, 2)
+  minOrderValue     Decimal   @db.Decimal(10, 2) @default(0)
+  startsAt          DateTime?
+  expiresAt         DateTime?
+  usageLimit        Int?
+  perUserLimit      Int?      @default(1)
+  firstOrderOnly    Boolean   @default(false)
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+}
+
+model CouponUsage {
+  id        String   @id @default(uuid())
+  couponId  String
+  userId    String
+  createdAt DateTime @default(now())
+}
+
+model DeliveryPartner {
+  id        String   @id @default(uuid())
+  name      String
+  phone     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+}
+
+model DeliveryAssignment {
+  id                String           @id @default(uuid())
+  orderId           String
+  order             Order            @relation(fields: [orderId], references: [id])
+  deliveryPartnerId String
+  status            String           @default("ASSIGNED")
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  orderId   String?
+  order     Order?   @relation(fields: [orderId], references: [id])
+  event     String
+  payload   String?
+  sent      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
