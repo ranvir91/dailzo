@@ -1,38 +1,37 @@
 # Dailzo MVP
 
-Dailzo is a mobile-first grocery and daily essentials ordering platform. This repository contains the initial Phase 1 foundation for a modular monolith architecture that can later evolve into a larger distributed platform.
+Dailzo is a mobile-first grocery and daily essentials ordering platform.
 
-## Current Phase
+## Repository structure
 
-Phase 1 focuses on:
-- repository structure and documentation
-- backend scaffold with a health endpoint
-- Docker Compose for local PostgreSQL and Redis
-- environment variable templates
-- placeholder mobile and admin application directories
+- `apps/mobile` — Flutter customer app
+- `server` — Laravel 11 + Filament backend: REST API (`/api/v1`) and admin panel (`/admin`), MySQL
+- `docs` — architecture, API and migration docs
+- `infrastructure` — deployment placeholders
 
-## Repository Structure
-
-- apps/mobile: Flutter customer app placeholder
-- apps/admin: React/Next.js admin placeholder
-- backend: NestJS + TypeScript modular monolith
-- infrastructure: Docker, AWS, and Terraform placeholders
-- docs: architecture and setup documentation
+The backend + admin were rewritten from NestJS/React to PHP —
+see [docs/php-migration-plan.md](docs/php-migration-plan.md).
 
 ## Quick start
 
-1. Copy .env.example to .env and adjust values.
-2. Start local dependencies:
-   docker compose up -d postgres redis
-3. Install backend dependencies:
-   cd backend && npm install
-4. Start the backend:
-   npm run start:dev
-5. Start the admin panel:
-   cd apps/admin && npm install && npm run dev
+```bash
+# 1. Local MySQL (host port 3307)
+docker compose up -d mysql
 
-The backend health endpoint will be available at:
-- http://localhost:3000/api/v1/health
+# 2. Backend API + admin panel
+cd server
+composer install
+cp .env.example .env
+php artisan key:generate     # only if APP_KEY is empty
+php artisan migrate --seed
+php artisan serve            # http://localhost:8000
 
-The admin panel will be available at:
-- http://localhost:5173
+# 3. Mobile app
+cd ../apps/mobile
+flutter run --dart-define=API_PORT=8000
+```
+
+- API health: http://localhost:8000/api/v1/health
+- Admin panel: http://localhost:8000/admin — `admin@dailzo.app` / `password`
+
+See [server/README.md](server/README.md) for details and demo accounts.
