@@ -43,3 +43,13 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# --dart-define-from-file configs — may hold API hosts / keys.
+# Commit only the *.example.json templates.
+/dart_defines/*
+!/dart_defines/*.example.json
+!/dart_defines/.gitkeep
+
+# Firebase / Google service configs
+**/google-services.json
+**/GoogleService-Info.plist

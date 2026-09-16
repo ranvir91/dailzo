@@ -1,30 +1,75 @@
-# Node
-node_modules/
+# ─────────────────────────────────────────────────────────────
+#  Environment files & secrets  (NEVER commit real credentials)
+# ─────────────────────────────────────────────────────────────
+.env
+.env.*
+*.env
+!.env.example
+!.env.*.example
+!*.env.example
+
+# Standalone secret material
+secrets/
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+auth.json
+credentials.json
+service-account*.json
+
+# Firebase / Google service configs (contain project keys)
+**/google-services.json
+**/GoogleService-Info.plist
+**/firebase-service-account*.json
+
+# Flutter --dart-define-from-file configs (hold API hosts / keys)
+apps/mobile/dart_defines/*
+!apps/mobile/dart_defines/*.example.json
+apps/deliveryApp/dart_defines/*
+!apps/deliveryApp/dart_defines/*.example.json
+
+# Android signing
+apps/mobile/android/key.properties
+apps/deliveryApp/android/key.properties
+
+# Flutter generated / ephemeral
+**/Flutter/ephemeral/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# ─────────────────────────────────────────────────────────────
+#  Build output & deploy bundles
+# ─────────────────────────────────────────────────────────────
+build/
 dist/
 coverage/
+*-deploy.zip
+
+# Local copies pulled back from the server (FTP/SFTP) — often hold prod .env
+/ftp/
+
+/server/vendor/
+/server/public/build/
+/server/public/hot/
+/server/public/storage/
+
+# ─────────────────────────────────────────────────────────────
+#  Node
+# ─────────────────────────────────────────────────────────────
+node_modules/
 .npm/
-backend/src/generated/
-
-# Environment
-.env
-.env.local
-.env.*.local
-
-# Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# OS
+# ─────────────────────────────────────────────────────────────
+#  OS / editor
+# ─────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
-
-# Flutter
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-build/
-
-# IDE
 .vscode/
 .idea/
+*.iml

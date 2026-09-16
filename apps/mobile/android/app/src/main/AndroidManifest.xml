@@ -1,6 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required for all builds, not just debug: the app talks to the
+         production API over HTTPS. The debug/profile AndroidManifest.xml
+         variants also declare this (for the Flutter tool's own hot-reload
+         connection), but a release build merges only this file — without it
+         here, a release APK has no network access at all and every request
+         fails at DNS resolution ("Failed host lookup"), regardless of host. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <application
-        android:label="dailzo_mobile"
+        android:label="Dailzo"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

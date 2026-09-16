@@ -80,12 +80,21 @@ class ApiService {
     }
   }
 
-  Future<void> sendOtp({required String phone}) async {
-    await _request(
+  /// Returns the generated OTP when the backend is running with OTP_DEBUG
+  /// enabled (no SMS gateway wired up yet) so the app can show it directly
+  /// instead of the caller needing to check server logs. Returns null in a
+  /// real/production setup, where the OTP is only ever sent by SMS.
+  Future<String?> sendOtp({required String phone}) async {
+    final json = await _request(
       method: 'POST',
       path: '/auth/send-otp',
       body: {'phone': phone},
     );
+    final data = json['data'];
+    if (data is Map<String, dynamic>) {
+      return data['otp']?.toString();
+    }
+    return null;
   }
 
   Future<AuthSession> login({

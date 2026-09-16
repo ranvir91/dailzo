@@ -32,7 +32,6 @@ class DailzoApp extends StatefulWidget {
 
 class _DailzoAppState extends State<DailzoApp> {
   bool _ready = false;
-  bool _authenticated = false;
   bool _maintenanceMode = false;
 
   @override
@@ -47,15 +46,12 @@ class _DailzoAppState extends State<DailzoApp> {
     if (!mounted) return;
     setState(() {
       _ready = true;
-      _authenticated = ApiService.instance.isAuthenticated;
       _maintenanceMode = maintenanceMode;
     });
   }
 
   Future<void> _handleLogout() async {
     await ApiService.instance.logout();
-    if (!mounted) return;
-    setState(() => _authenticated = false);
   }
 
   @override
@@ -72,14 +68,14 @@ class _DailzoAppState extends State<DailzoApp> {
       debugShowCheckedModeBanner: false,
       title: 'Dailzo',
       theme: ThemeData(useMaterial3: true, colorScheme: colorScheme),
+      // No login gate here: browsing is open to everyone. HomeScreen itself
+      // prompts login only for the actions that actually need an account
+      // (cart, checkout, orders, profile).
       home: !_ready
           ? const Scaffold(body: Center(child: CircularProgressIndicator()))
           : _maintenanceMode
               ? MaintenanceScreen(onRetry: _bootstrap)
-              : _authenticated
-                  ? HomeScreen(onLogout: _handleLogout)
-                  : LoginScreen(
-                      onLoginSuccess: () => setState(() => _authenticated = true)),
+              : HomeScreen(onLogout: _handleLogout),
     );
   }
 }
@@ -125,14 +121,27 @@ class _HomeScreenState extends State<HomeScreen> {
       _error = null;
     });
     try {
+      // Categories/products/coupons/pincodes/settings are public and always
+      // loaded so guests can browse freely. Cart/addresses/orders/profile
+      // need an account, so they're only fetched when logged in — otherwise
+      // they'd 401 and block the whole page behind the error screen below.
+      final authenticated = ApiService.instance.isAuthenticated;
       final results = await Future.wait<dynamic>([
         ApiService.instance.fetchCategories(),
         ApiService.instance.fetchProducts(),
-        ApiService.instance.fetchCart(),
-        ApiService.instance.fetchAddresses(),
+        authenticated
+            ? ApiService.instance.fetchCart()
+            : Future.value(Cart(id: '', items: const [])),
+        authenticated
+            ? ApiService.instance.fetchAddresses()
+            : Future.value(<Address>[]),
         ApiService.instance.fetchCoupons(),
-        ApiService.instance.fetchOrders(),
-        ApiService.instance.fetchProfile(),
+        authenticated
+            ? ApiService.instance.fetchOrders()
+            : Future.value(<Order>[]),
+        authenticated
+            ? ApiService.instance.fetchProfile()
+            : Future.value(null),
         ApiService.instance.fetchServiceablePincodes(),
         ApiService.instance.fetchStoreSettings(),
       ]);
@@ -179,7 +188,33 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _orders = orders);
   }
 
+  /// Prompts login when the caller is about to do something that needs an
+  /// account (cart, checkout, orders, profile). Returns true once the user
+  /// is authenticated (already was, or just logged in); false if they
+  /// dismissed the login screen, in which case the caller should just do
+  /// nothing and let them keep browsing.
+  Future<bool> _ensureLoggedIn({required String message}) async {
+    if (ApiService.instance.isAuthenticated) return true;
+    if (!mounted) return false;
+    final loggedIn = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => LoginScreen(
+          message: message,
+          onLoginSuccess: () {},
+        ),
+      ),
+    );
+    if (loggedIn != true) return false;
+    if (mounted) await _loadData();
+    return true;
+  }
+
   Future<void> _addToCart(Product product) async {
+    final ok = await _ensureLoggedIn(
+      message: 'Login to add items to your cart.',
+    );
+    if (!ok) return;
+
     final existingItem = _cart.items
         .where((item) => item.productId == product.id)
         .toList();
@@ -278,11 +313,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _goToCart() async {
+    final ok = await _ensureLoggedIn(message: 'Login to view your cart.');
+    if (!ok || !mounted) return;
     Navigator.of(context).popUntil((route) => route.isFirst);
     setState(() => _selectedIndex = 2);
   }
 
   Future<void> _goToCheckout() async {
+    final ok = await _ensureLoggedIn(message: 'Login to checkout.');
+    if (!ok || !mounted) return;
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => CheckoutScreen(
@@ -368,7 +407,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   IconButton(
                     tooltip: 'Cart',
-                    onPressed: () => setState(() => _selectedIndex = 2),
+                    onPressed: () => _selectTab(2),
                     icon: Badge.count(
                       count: _cartItemCount,
                       isLabelVisible: _cartItemCount > 0,
@@ -701,6 +740,21 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Cart (2) and Buy Again (3) need an account; Home (0) and Categories (1)
+  /// are open to guests.
+  Future<void> _selectTab(int index) async {
+    if (index == 2 || index == 3) {
+      final ok = await _ensureLoggedIn(
+        message: index == 2
+            ? 'Login to view your cart.'
+            : 'Login to view your orders.',
+      );
+      if (!ok) return;
+    }
+    if (!mounted) return;
+    setState(() => _selectedIndex = index);
+  }
+
   Widget _buildBottomNav() {
     return Theme(
       data: Theme.of(context).copyWith(
@@ -714,8 +768,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: NavigationBar(
         selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) =>
-            setState(() => _selectedIndex = index),
+        onDestinationSelected: _selectTab,
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Home'),
           NavigationDestination(
@@ -782,6 +835,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _openProfile() async {
+    final ok = await _ensureLoggedIn(message: 'Login to view your profile.');
+    if (!ok || !mounted) return;
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ProfileScreen(

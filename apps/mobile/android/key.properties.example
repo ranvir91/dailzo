@@ -1,0 +1,9 @@
+# Copy this file to android/key.properties (gitignored) and fill in the
+# values from the upload keystore you generate — see the release build steps
+# in the project README. Never commit the real key.properties or the .jks
+# file; losing this keystore means you can never update the app under the
+# same Play Store listing again.
+storePassword=CHANGE_ME
+keyPassword=CHANGE_ME
+keyAlias=upload
+storeFile=/absolute/path/to/upload-keystore.jks
