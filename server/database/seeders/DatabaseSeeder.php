@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Category;
+use App\Models\DeliveryPartner;
 use App\Models\Product;
 use App\Models\ServicePincode;
 use App\Models\StoreSetting;
@@ -28,12 +29,25 @@ class DatabaseSeeder extends Seeder
         // Demo customer — logs in via phone/OTP on the mobile app.
         User::firstOrCreate(['phone' => '9999999999'], ['name' => 'Demo Customer', 'role' => 'CUSTOMER']);
 
-        // Demo admin — mobile OTP login AND the Filament panel (email + password).
+        // Admin — mobile OTP login AND the Filament panel (email + password).
+        // Set SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD in the environment before the
+        // first seed so production never starts with a publicly-known password.
+        // firstOrCreate: an existing admin (e.g. one whose password was changed in
+        // the panel) is left untouched on re-seed.
         User::firstOrCreate(['phone' => '9999999998'], [
-            'name' => 'Demo Admin',
+            'name' => 'Admin',
             'role' => 'ADMIN',
-            'email' => 'admin@dailzo.app',
-            'password' => 'password',
+            'email' => config('dailzo.seed_admin_email'),
+            'password' => config('dailzo.seed_admin_password'),
+        ]);
+
+        // Demo delivery partner — logs in to the partner mobile app with
+        // phone_number + password. Change/rotate for production the same way
+        // as the admin credentials above.
+        DeliveryPartner::firstOrCreate(['phone' => '8999999999'], [
+            'name' => 'Demo Partner',
+            'password' => config('dailzo.seed_admin_password'),
+            'is_active' => true,
         ]);
 
         // A little sample content so the mobile app has something to show in dev.

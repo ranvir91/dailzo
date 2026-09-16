@@ -64,6 +64,15 @@ class OrderResource extends Resource
                 Infolists\Components\TextEntry::make('quantity'),
                 Infolists\Components\TextEntry::make('price')->money('INR'),
             ])->columns(3),
+            Infolists\Components\RepeatableEntry::make('comments')
+                ->label('Delivery notes')
+                ->schema([
+                    Infolists\Components\TextEntry::make('body')->label('')->columnSpanFull(),
+                    Infolists\Components\TextEntry::make('deliveryPartner.name')->label('By')->placeholder('—'),
+                    Infolists\Components\TextEntry::make('type')->badge(),
+                    Infolists\Components\TextEntry::make('created_at')->dateTime(),
+                ])->columns(3)
+                ->visible(fn ($record) => $record->comments->isNotEmpty()),
         ]);
     }
 

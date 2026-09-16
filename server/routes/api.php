@@ -10,6 +10,9 @@ use App\Http\Controllers\Api\V1\DeliveryController;
 use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\OrderController;
+use App\Http\Controllers\Api\V1\Partner\PartnerAuthController;
+use App\Http\Controllers\Api\V1\Partner\PartnerOrderController;
+use App\Http\Controllers\Api\V1\Partner\PartnerSearchController;
 use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\SettingController;
@@ -116,4 +119,31 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
 
     Route::get('admin/dashboard', [AdminController::class, 'dashboard']);
     Route::get('admin/orders', [AdminController::class, 'orders']);
+});
+
+// ---------------------------------------------------------------------------
+// Delivery-partner mobile app.
+//
+// Namespaced under /partner/* — the spec this was built from reused paths
+// like `/auth/login` and `/orders`, which already exist above for the
+// customer/admin app with a different payload and response shape. Rather
+// than overload one URL with two incompatible contracts, the partner app
+// gets its own prefix:
+//   POST /auth/login               -> POST /partner/login
+//   GET  /orders                   -> GET  /partner/orders
+//   PATCH /orders/:id/status       -> PATCH /partner/orders/:id/status
+//   POST /orders/:id/comments      -> POST /partner/orders/:id/comments
+//   GET  /partners/search          -> GET  /partner/search
+//   POST /orders/:id/reassign      -> POST /partner/orders/:id/reassign
+// ---------------------------------------------------------------------------
+Route::prefix('partner')->group(function () {
+    Route::post('login', [PartnerAuthController::class, 'login'])->middleware('throttle:partner-login');
+
+    Route::middleware(['auth:sanctum', 'partner'])->group(function () {
+        Route::get('orders', [PartnerOrderController::class, 'index']);
+        Route::patch('orders/{orderId}/status', [PartnerOrderController::class, 'updateStatus']);
+        Route::post('orders/{orderId}/comments', [PartnerOrderController::class, 'addComment']);
+        Route::post('orders/{orderId}/reassign', [PartnerOrderController::class, 'reassign']);
+        Route::get('search', [PartnerSearchController::class, 'search']);
+    });
 });

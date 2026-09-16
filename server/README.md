@@ -48,6 +48,12 @@ response while `OTP_DEBUG=true`):
 | 9999999999 | CUSTOMER | – |
 | 9999999998 | ADMIN | `admin@dailzo.app` / `password` |
 
+Delivery-partner app (separate mobile app, phone + password): `8999999999` /
+`password` (or your `SEED_ADMIN_PASSWORD`, reused for this seed too — see
+`DatabaseSeeder`). Logs in at `POST /api/v1/partner/login`, not `/auth/login` —
+see `docs/api.md`. Manage partners in Filament under **Sales → Delivery
+partners**.
+
 ## Port status
 
 | Area | API | Filament |

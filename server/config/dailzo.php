@@ -15,4 +15,10 @@ return [
     // Max upload size for the /uploads endpoint, in kilobytes (8 MB, as before).
     'upload_max_kb' => (int) env('UPLOAD_MAX_KB', 8192),
 
+    // Admin account created by DatabaseSeeder. Set these in the environment
+    // before the first seed in production. (Read via config, not env() directly,
+    // so it still works when the config is cached.)
+    'seed_admin_email' => env('SEED_ADMIN_EMAIL', 'admin@dailzo.app'),
+    'seed_admin_password' => env('SEED_ADMIN_PASSWORD', 'password'),
+
 ];

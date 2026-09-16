@@ -213,3 +213,24 @@ If no SSH: commit Filament's published assets (`php artisan filament:assets`,
 `storage:link` symlink needed (symlinks are often disabled on shared hosting). Raise
 `upload_max_filesize` / `post_max_size` to ≥ 8 MB via cPanel *MultiPHP INI Editor* or
 `.user.ini`.
+
+## Known issue — coupon date storage (found 2026-09-15)
+
+`config/database.php`'s `mysql` connection has no `timezone` override, so Carbon
+writes/reads datetime columns using whatever timezone the Carbon instance itself
+carries — no conversion happens. With `APP_TIMEZONE=Asia/Kolkata`, `now()` and every
+auto-set `created_at`/`updated_at` are stored as **IST wall-clock digits** (verified
+against the dev DB).
+
+`CouponService::parseDate()` explicitly converts a bare date to **UTC** before storing
+it in `coupons.starts_at` / `expires_at`. That's a mismatch: the column ends up 5h30m
+*earlier* than every other timestamp in the database (which are IST, unconverted), so
+`Coupon::scopeActive()` compares apples to oranges — a coupon meant to start "on the
+15th" actually keys off midnight IST minus 5:30, i.e. becomes active during the previous
+evening, and one meant to expire "at the end of the 15th" expires 5:30 early too.
+
+**Fix:** drop the `->utc()` call in `CouponService::parseDate()` (mirror
+`App\Support\IstDate`, added for the delivery-partner API, which deliberately does
+*not* convert). Not fixed here to avoid touching passing, unrelated coupon tests as a
+side effect of an unrelated task — needs its own pass (re-verify `CouponService`'s
+existing tests still express the intended behavior once the conversion is removed).

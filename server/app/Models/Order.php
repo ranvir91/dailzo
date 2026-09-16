@@ -60,9 +60,27 @@ class Order extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function address()
+    {
+        return $this->belongsTo(Address::class);
+    }
+
     public function items()
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    public function comments()
+    {
+        return $this->hasMany(OrderComment::class);
+    }
+
+    /** The assignment currently responsible for this order (not reassigned away), if any. */
+    public function activeAssignment()
+    {
+        return $this->hasOne(DeliveryAssignment::class)
+            ->where('status', '!=', DeliveryAssignment::STATUS_REASSIGNED)
+            ->latestOfMany();
     }
 
     public function payments()

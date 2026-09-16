@@ -1,0 +1,9 @@
+# Product/category images here are served directly by Apache as static files
+# (see public/.htaccess: existing files are never rewritten to index.php), so
+# Laravel's CORS middleware (config/cors.php) never runs for this path. Set
+# the header here instead so the app can be loaded from another origin
+# (e.g. Flutter web running on localhost) without the browser blocking the
+# image fetch.
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "*"
+</IfModule>

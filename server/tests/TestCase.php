@@ -2,6 +2,7 @@
 
 namespace Tests;
 
+use App\Models\DeliveryPartner;
 use App\Models\User;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Routing\Middleware\ThrottleRequests;
@@ -22,6 +23,14 @@ abstract class TestCase extends BaseTestCase
     protected function actingAsUser(User $user): static
     {
         Sanctum::actingAs($user, ['*']);
+
+        return $this;
+    }
+
+    /** Authenticate the following request(s) as $partner via a Sanctum token. */
+    protected function actingAsPartner(DeliveryPartner $partner): static
+    {
+        Sanctum::actingAs($partner, ['*']);
 
         return $this;
     }

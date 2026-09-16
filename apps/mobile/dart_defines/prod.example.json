@@ -1,0 +1,6 @@
+{
+  "API_SCHEME": "https",
+  "API_HOST": "api.yourdomain.com",
+  "API_PORT": "443",
+  "API_PREFIX": "/api/v1"
+}
