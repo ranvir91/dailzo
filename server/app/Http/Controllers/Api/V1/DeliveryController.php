@@ -5,12 +5,16 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\DeliveryAssignment;
 use App\Models\DeliveryPartner;
+use App\Models\Order;
+use App\Services\DeliveryAssignmentService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class DeliveryController extends Controller
 {
+    public function __construct(private readonly DeliveryAssignmentService $assignmentService) {}
+
     public function partners(): JsonResponse
     {
         return ApiResponse::success(
@@ -26,11 +30,9 @@ class DeliveryController extends Controller
             'deliveryPartnerId' => ['required', 'string', 'exists:delivery_partners,id'],
         ]);
 
-        $assignment = DeliveryAssignment::create([
-            'order_id' => $data['orderId'],
-            'delivery_partner_id' => $data['deliveryPartnerId'],
-            'status' => 'ASSIGNED',
-        ]);
+        $order = Order::findOrFail($data['orderId']);
+        $partner = DeliveryPartner::findOrFail($data['deliveryPartnerId']);
+        $assignment = $this->assignmentService->assign($order, $partner);
 
         return ApiResponse::success([
             'assignedPartnerId' => $assignment->delivery_partner_id,

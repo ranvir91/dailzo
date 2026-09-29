@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\AssignsSequentialNumber;
 use App\Support\SerializesToCamelCase;
+use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -15,8 +16,9 @@ use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable implements FilamentUser
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
+    /** @use HasFactory<UserFactory> */
     use AssignsSequentialNumber;
+
     use HasApiTokens;
     use HasFactory;
     use HasUuids;
@@ -53,12 +55,36 @@ class User extends Authenticatable implements FilamentUser
 
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->role === 'ADMIN';
+        return match ($panel->getId()) {
+            'admin' => $this->role === 'ADMIN',
+            'octa' => $this->role === 'VENDOR' && ($this->vendorProfile?->is_active ?? false),
+            default => false,
+        };
     }
 
     public function isAdmin(): bool
     {
         return $this->role === 'ADMIN';
+    }
+
+    public function isVendor(): bool
+    {
+        return $this->role === 'VENDOR';
+    }
+
+    public function isDeliveryPartner(): bool
+    {
+        return $this->role === 'DELIVERY_PARTNER';
+    }
+
+    public function vendorProfile()
+    {
+        return $this->hasOne(Vendor::class);
+    }
+
+    public function deliveryPartnerProfile()
+    {
+        return $this->hasOne(DeliveryPartner::class);
     }
 
     public function addresses()

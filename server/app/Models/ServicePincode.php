@@ -15,6 +15,7 @@ class ServicePincode extends Model
 
     protected $fillable = [
         'pincode',
+        'area_name',
         'is_active',
     ];
 

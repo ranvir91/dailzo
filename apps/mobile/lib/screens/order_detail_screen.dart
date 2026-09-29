@@ -163,7 +163,25 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 padding: const EdgeInsets.all(12),
                 child: Row(
                   children: [
-                    const Icon(Icons.shopping_bag_outlined, size: 18),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest,
+                        child: item.imageUrl.isEmpty
+                            ? const Icon(Icons.shopping_bag_outlined, size: 18)
+                            : Image.network(
+                                item.imageUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => const Icon(
+                                    Icons.shopping_bag_outlined,
+                                    size: 18),
+                              ),
+                      ),
+                    ),
                     const SizedBox(width: 10),
                     Expanded(child: Text(item.displayText)),
                   ],

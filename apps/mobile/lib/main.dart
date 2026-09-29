@@ -139,9 +139,7 @@ class _HomeScreenState extends State<HomeScreen> {
         authenticated
             ? ApiService.instance.fetchOrders()
             : Future.value(<Order>[]),
-        authenticated
-            ? ApiService.instance.fetchProfile()
-            : Future.value(null),
+        authenticated ? ApiService.instance.fetchProfile() : Future.value(null),
         ApiService.instance.fetchServiceablePincodes(),
         ApiService.instance.fetchStoreSettings(),
       ]);
@@ -215,9 +213,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     if (!ok) return;
 
-    final existingItem = _cart.items
-        .where((item) => item.productId == product.id)
-        .toList();
+    final existingItem =
+        _cart.items.where((item) => item.productId == product.id).toList();
     if (existingItem.isNotEmpty) {
       final item = existingItem.first;
       await ApiService.instance.updateCartItem(
@@ -225,8 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
         quantity: item.quantity + 1,
       );
     } else {
-      await ApiService.instance
-          .addCartItem(productId: product.id, quantity: 1);
+      await ApiService.instance.addCartItem(productId: product.id, quantity: 1);
     }
     await _refreshCart();
     if (mounted) {
@@ -359,7 +355,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Image.asset('web/logo-demo.png',
+                  Image.asset('assets/branding/Dailzo_logo.png',
                       width: 84, height: 30, fit: BoxFit.contain),
                   const SizedBox(width: 8),
                   Expanded(
@@ -376,9 +372,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               children: [
                                 Icon(Icons.location_on_outlined,
                                     size: 15,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .primary),
+                                    color:
+                                        Theme.of(context).colorScheme.primary),
                                 const SizedBox(width: 2),
                                 Flexible(
                                   child: Text(
@@ -391,8 +386,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         fontWeight: FontWeight.w700),
                                   ),
                                 ),
-                                const Icon(Icons.keyboard_arrow_down,
-                                    size: 16),
+                                const Icon(Icons.keyboard_arrow_down, size: 16),
                               ],
                             ),
                           ),
@@ -461,8 +455,7 @@ class _HomeScreenState extends State<HomeScreen> {
             final filtered = _serviceablePincodes
                 .where((p) => query.isEmpty || p.pincode.contains(query))
                 .toList();
-            final exactMatchExists =
-                filtered.any((p) => p.pincode == query);
+            final exactMatchExists = filtered.any((p) => p.pincode == query);
             return Padding(
               padding: EdgeInsets.only(
                 left: 16,
@@ -602,8 +595,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ? Theme.of(context).colorScheme.primaryContainer
                         : Theme.of(context).colorScheme.surfaceContainerHighest,
                     child: _buildCategoryVisual(category,
-                        size: category.iconUrl.isEmpty ? 15 : 30,
-                        color: color),
+                        size: category.iconUrl.isEmpty ? 15 : 30, color: color),
                   ),
                   const SizedBox(height: 5),
                   Text(
@@ -727,8 +719,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 10.5,
-                      fontWeight:
-                          selected ? FontWeight.w700 : FontWeight.w500,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                     ),
                   ),
                 ],

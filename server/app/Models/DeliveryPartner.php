@@ -2,43 +2,59 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\SyncsDeliveryPartnerUser;
 use App\Support\SerializesToCamelCase;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Foundation\Auth\User as Authenticatable;
-use Laravel\Sanctum\HasApiTokens;
 
 /**
- * A delivery partner. Also the auth principal for the delivery-partner mobile
- * app (phone + password, Sanctum tokens) — see PartnerAuthController.
+ * A delivery partner's profile and delivery history. Login now goes through
+ * the linked User (role = DELIVERY_PARTNER, see PartnerAuthController) —
+ * this table is no longer itself an auth principal (it used to extend
+ * Authenticatable with HasApiTokens before partner login was consolidated
+ * onto users). `phone` here is kept as a mirror of user.phone (written
+ * together by DeliveryPartnerResource/Concerns\SyncsDeliveryPartnerUser) so
+ * existing search/display queries against this table don't need to join
+ * through user. `password` is vestigial — no longer read or written — left
+ * in the schema rather than dropped for now.
  */
-class DeliveryPartner extends Authenticatable
+class DeliveryPartner extends Model
 {
-    use HasApiTokens;
     use HasFactory;
     use HasUuids;
     use SerializesToCamelCase;
     use SoftDeletes;
+    use SyncsDeliveryPartnerUser;
 
     protected $fillable = [
+        'user_id',
+        'vendor_id',
         'name',
         'phone',
-        'password',
         'is_active',
     ];
 
     protected $hidden = [
         'password',
-        'remember_token',
     ];
 
     protected function casts(): array
     {
         return [
-            'password' => 'hashed',
             'is_active' => 'boolean',
         ];
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function vendor()
+    {
+        return $this->belongsTo(Vendor::class);
     }
 
     public function assignments()
@@ -54,11 +70,6 @@ class DeliveryPartner extends Authenticatable
             ->where('status', '!=', DeliveryAssignment::STATUS_REASSIGNED)
             ->latest()
             ->first();
-    }
-
-    public function refreshTokens()
-    {
-        return $this->hasMany(PartnerRefreshToken::class);
     }
 
     public function comments()

@@ -24,6 +24,9 @@ class ServicePincodeResource extends Resource
     {
         return $form->schema([
             Forms\Components\TextInput::make('pincode')->required()->unique(ignoreRecord: true),
+            Forms\Components\TextInput::make('area_name')
+                ->label('Area name')
+                ->helperText('e.g. the locality/sector this pincode covers — shown alongside the pincode wherever it\'s picked from a list.'),
             Forms\Components\Toggle::make('is_active')->default(true),
         ]);
     }
@@ -33,6 +36,7 @@ class ServicePincodeResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('pincode')->searchable()->sortable(),
+                Tables\Columns\TextColumn::make('area_name')->label('Area')->searchable()->placeholder('—'),
                 Tables\Columns\ToggleColumn::make('is_active'),
                 Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable()->toggleable(),
             ])

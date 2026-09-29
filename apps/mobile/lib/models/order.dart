@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../config/app_env.dart';
+
 class Order {
   Order({
     required this.id,
@@ -69,13 +71,32 @@ class OrderLineItem {
     required this.productId,
     required this.productName,
     required this.quantity,
+    this.imageUrl = '',
   });
 
   final String productId;
   final String productName;
   final int quantity;
+  final String imageUrl;
 
   String get displayText => '$productName x$quantity';
+
+  static String _resolveImageUrl(dynamic product) {
+    if (product is! Map<String, dynamic>) return '';
+    final images = product['images'];
+    if (images is List) {
+      for (final image in images) {
+        if (image is String && image.trim().isNotEmpty) {
+          return AppEnv.resolveAssetUrl(image);
+        }
+      }
+    }
+    final single = product['imageUrl'] ?? product['image'];
+    if (single is String && single.trim().isNotEmpty) {
+      return AppEnv.resolveAssetUrl(single);
+    }
+    return '';
+  }
 
   factory OrderLineItem.fromJson(Map<String, dynamic> json) {
     final productId = json['productId']?.toString() ?? 'item';
@@ -87,6 +108,7 @@ class OrderLineItem {
       productId: productId,
       productName: productName.isNotEmpty ? productName : productId,
       quantity: int.tryParse(json['quantity']?.toString() ?? '1') ?? 1,
+      imageUrl: _resolveImageUrl(product),
     );
   }
 }

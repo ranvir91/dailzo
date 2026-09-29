@@ -33,13 +33,37 @@ class OrderApiTest extends TestCase
         StoreSetting::current()->update(['min_order_value' => 199, 'min_order_value_enabled' => true]);
 
         $customer = User::factory()->create();
-        $product = Product::factory()->create();
+        // The minimum-order check runs against the real cart subtotal (price
+        // x quantity from the DB), not the client-sent `total` — a client
+        // can no longer dodge it by just sending a smaller total.
+        $product = Product::factory()->create(['price' => 50, 'discounted_price' => null]);
 
         $this->actingAsUser($customer)->postJson('/api/v1/orders', [
             'paymentMethod' => 'COD',
-            'total' => 50,
+            'total' => 500,
             'items' => [['productId' => $product->id, 'quantity' => 1]],
         ])->assertStatus(400)->assertJsonPath('success', false);
+    }
+
+    public function test_delivery_charges_are_snapshotted_at_order_time_not_recomputed_later(): void
+    {
+        StoreSetting::current()->update(['delivery_charges' => 49]);
+        $customer = User::factory()->create();
+        $product = Product::factory()->create(['price' => 100, 'discounted_price' => null]);
+
+        $order = $this->actingAsUser($customer)->postJson('/api/v1/orders', [
+            'paymentMethod' => 'COD',
+            'total' => 1,
+            'items' => [['productId' => $product->id, 'quantity' => 1]],
+        ])->assertOk()->json('data');
+
+        $this->assertSame('49.00', $order['deliveryCharges']);
+        $this->assertSame('149.00', $order['total']);
+
+        // Store-wide delivery charge changes later must not retroactively
+        // change what an already-placed order shows it was charged.
+        StoreSetting::current()->update(['delivery_charges' => 99]);
+        $this->assertSame('49.00', Order::find($order['id'])->fresh()->delivery_charges);
     }
 
     public function test_customers_only_see_their_own_orders_but_admins_see_all(): void

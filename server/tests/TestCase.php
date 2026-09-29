@@ -27,10 +27,15 @@ abstract class TestCase extends BaseTestCase
         return $this;
     }
 
-    /** Authenticate the following request(s) as $partner via a Sanctum token. */
+    /**
+     * Authenticate the following request(s) as $partner via a Sanctum token.
+     * Partner login goes through the linked User now (role = DELIVERY_PARTNER),
+     * so the token is actually issued to that User — this helper still takes a
+     * DeliveryPartner for convenience at the call site.
+     */
     protected function actingAsPartner(DeliveryPartner $partner): static
     {
-        Sanctum::actingAs($partner, ['*']);
+        Sanctum::actingAs($partner->user, ['*']);
 
         return $this;
     }

@@ -16,6 +16,16 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/branding/
+
+# Run `dart run flutter_launcher_icons` after changing the source image to
+# regenerate the Android launcher icon from it. This app only targets
+# Android (see android/ — no ios/ directory), so only that platform is set.
+flutter_launcher_icons:
+  image_path: 'assets/branding/Dailzo_icon.png'
+  android: true

@@ -60,17 +60,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   /// A coupon is only usable when the cart meets its own minimum order
   /// value, it isn't restricted to first-time orders the user already
-  /// placed one, and it hasn't passed its expiry.
+  /// placed one, it hasn't passed its expiry, and — the check that was
+  /// missing before — the signed-in user hasn't already redeemed it as many
+  /// times as its perUserLimit allows. This mirrors (but does not replace)
+  /// the authoritative checks in CouponService::resolveForCheckout on the
+  /// backend, which rejects the order outright if any of these slip
+  /// through here.
   bool _isCouponEligible(Coupon coupon, double subtotal) {
+    if (!coupon.isActive) return false;
     if (subtotal < coupon.minOrderValue) return false;
     if (coupon.firstOrderOnly && widget.hasPriorOrders) return false;
     if (coupon.expiresAt != null && coupon.expiresAt!.isBefore(DateTime.now())) {
       return false;
     }
+    if (coupon.isExhaustedByUser) return false;
     return true;
   }
 
   String _ineligibilityReason(Coupon coupon, double subtotal) {
+    if (!coupon.isActive) {
+      return 'unavailable';
+    }
     if (subtotal < coupon.minOrderValue) {
       return 'min order ₹${coupon.minOrderValue.toStringAsFixed(0)}';
     }
@@ -79,6 +89,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
     if (coupon.expiresAt != null && coupon.expiresAt!.isBefore(DateTime.now())) {
       return 'expired';
+    }
+    if (coupon.isExhaustedByUser) {
+      return 'usage limit reached';
     }
     return 'not eligible';
   }
@@ -246,6 +259,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             paymentMethod: _paymentMethod,
                             total: total,
                             items: widget.cart.items,
+                            couponCode: _selectedCoupon?.code,
                           );
                           String? paymentError;
                           try {
@@ -280,8 +294,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           );
                         } catch (error) {
                           if (!context.mounted) return;
+                          // Show the server's message as-is (e.g. "You have
+                          // already used this coupon the maximum number of
+                          // times") — no "Checkout failed:"/"Exception:"
+                          // framing in front of it.
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Checkout failed: $error')),
+                            SnackBar(content: Text('$error')),
                           );
                         } finally {
                           if (mounted) {

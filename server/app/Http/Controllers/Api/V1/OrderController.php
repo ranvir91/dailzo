@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\StoreSetting;
+use App\Services\CouponService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,23 +14,26 @@ use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
-    private const WITH = ['items.product'];
+    private const WITH = ['items.product', 'coupon'];
+
+    public function __construct(private readonly CouponService $coupons) {}
 
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
             'addressId' => ['sometimes', 'nullable', 'string'],
             'paymentMethod' => ['required', 'string'],
+            // Kept for backward compatibility with older app builds; no
+            // longer trusted for the order total (see below) — a client
+            // could otherwise send any total it likes, coupon rules or not.
             'total' => ['required', 'numeric'],
+            'couponCode' => ['sometimes', 'nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.productId' => ['required', 'string'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
         ]);
 
         $settings = StoreSetting::current();
-        if ($settings->min_order_value_enabled && $data['total'] < (float) $settings->min_order_value) {
-            abort(400, "Minimum order value is ₹{$settings->min_order_value}. Please add more items to your cart.");
-        }
 
         $prices = Product::whereIn('id', collect($data['items'])->pluck('productId'))
             ->get()
@@ -37,11 +41,29 @@ class OrderController extends Controller
                 $p->id => (float) ($p->discounted_price ?? $p->price),
             ]);
 
-        $order = DB::transaction(function () use ($request, $data, $prices) {
+        $subtotal = collect($data['items'])
+            ->sum(fn (array $item) => ($prices[$item['productId']] ?? 0) * $item['quantity']);
+
+        if ($settings->min_order_value_enabled && $subtotal < (float) $settings->min_order_value) {
+            abort(400, "Minimum order value is ₹{$settings->min_order_value}. Please add more items to your cart.");
+        }
+
+        $order = DB::transaction(function () use ($request, $data, $prices, $subtotal, $settings) {
+            ['coupon' => $coupon, 'discount' => $discount] = $this->coupons->resolveForCheckout(
+                $data['couponCode'] ?? null,
+                $request->user(),
+                $subtotal,
+            );
+
+            $total = max(0, $subtotal + (float) $settings->delivery_charges - $discount);
+
             $order = $request->user()->orders()->create([
                 'status' => 'PENDING',
                 'payment_method' => $data['paymentMethod'],
-                'total' => $data['total'],
+                'total' => $total,
+                'coupon_id' => $coupon?->id,
+                'discount_amount' => $discount,
+                'delivery_charges' => (float) $settings->delivery_charges,
                 'address_id' => $data['addressId'] ?? null,
             ]);
 
@@ -50,6 +72,13 @@ class OrderController extends Controller
                     'product_id' => $item['productId'],
                     'quantity' => $item['quantity'],
                     'price' => $prices[$item['productId']] ?? 0,
+                ]);
+            }
+
+            if ($coupon) {
+                $coupon->usages()->create([
+                    'user_id' => $request->user()->id,
+                    'order_id' => $order->id,
                 ]);
             }
 
