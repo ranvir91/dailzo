@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Partner;
 
 use App\Http\Controllers\Controller;
-use App\Models\DeliveryPartner;
+use App\Models\User;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,25 +19,32 @@ class PartnerAuthController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        $partner = DeliveryPartner::where('phone', $data['phone_number'])->first();
+        $user = User::where('phone', $data['phone_number'])->where('role', 'DELIVERY_PARTNER')->first();
 
-        if (! $partner || ! $partner->password || ! Hash::check($data['password'], $partner->password)) {
+        if (! $user || ! $user->password || ! Hash::check($data['password'], $user->password)) {
             return ApiResponse::error('Invalid phone number or password', ['Invalid credentials'], 401);
         }
 
-        if (! $partner->is_active) {
+        $partner = $user->deliveryPartnerProfile;
+
+        if (! $partner || ! $partner->is_active) {
             return ApiResponse::error('This delivery partner account is inactive', ['Account inactive'], 401);
         }
 
         $refreshToken = Str::random(64);
-        $partner->refreshTokens()->create([
+        // Same refresh_tokens table every other login (customer/admin) uses —
+        // now that partner login goes through users too, there's no reason for
+        // a separate partner_refresh_tokens table.
+        $user->refreshTokens()->create([
             'token' => hash('sha256', $refreshToken),
             'expires_at' => now()->addDays(config('dailzo.refresh_token_ttl_days')),
         ]);
 
         return ApiResponse::success([
-            'token' => $partner->createToken('partner-mobile')->plainTextToken,
+            'token' => $user->createToken('partner-mobile')->plainTextToken,
             'refreshToken' => $refreshToken,
+            // Unchanged shape: still delivery_partners.id, not users.id — the
+            // delivery app's existing API contract doesn't need to change.
             'partnerId' => $partner->id,
             'name' => $partner->name,
         ], 'Login successful');

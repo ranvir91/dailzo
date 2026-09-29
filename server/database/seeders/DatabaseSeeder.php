@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\ServicePincode;
 use App\Models\StoreSetting;
 use App\Models\User;
+use App\Models\Vendor;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
@@ -26,10 +27,15 @@ class DatabaseSeeder extends Seeder
             $c['slug'] => Category::updateOrCreate(['slug' => $c['slug']], $c),
         ]);
 
+        // Serviceable pincodes — seeded before the vendor below so it has
+        // something to cover.
+        $pincodes = collect(['121001', '121002', '121003', '121004'])
+            ->map(fn ($pincode) => ServicePincode::firstOrCreate(['pincode' => $pincode], ['is_active' => true]));
+
         // Demo customer — logs in via phone/OTP on the mobile app.
         User::firstOrCreate(['phone' => '9999999999'], ['name' => 'Demo Customer', 'role' => 'CUSTOMER']);
 
-        // Admin — mobile OTP login AND the Filament panel (email + password).
+        // Admin — mobile OTP login AND the Atlas panel (email + password).
         // Set SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD in the environment before the
         // first seed so production never starts with a publicly-known password.
         // firstOrCreate: an existing admin (e.g. one whose password was changed in
@@ -41,12 +47,30 @@ class DatabaseSeeder extends Seeder
             'password' => config('dailzo.seed_admin_password'),
         ]);
 
-        // Demo delivery partner — logs in to the partner mobile app with
-        // phone_number + password. Change/rotate for production the same way
-        // as the admin credentials above.
-        DeliveryPartner::firstOrCreate(['phone' => '8999999999'], [
-            'name' => 'Demo Partner',
+        // Demo vendor — logs in to the Octa panel with phone + password (same
+        // rotate-for-production note as the admin credentials above).
+        $vendorUser = User::firstOrCreate(['phone' => '7999999999'], [
+            'name' => 'Demo Vendor',
+            'role' => 'VENDOR',
             'password' => config('dailzo.seed_admin_password'),
+        ]);
+        $vendor = Vendor::firstOrCreate(['user_id' => $vendorUser->id], [
+            'business_name' => 'Demo Vendor Co.',
+            'is_active' => true,
+        ]);
+        $vendor->servicePincodes()->syncWithoutDetaching($pincodes->pluck('id'));
+
+        // Demo delivery partner, belonging to the demo vendor above — logs in
+        // to the partner mobile app with phone_number + password.
+        $partnerUser = User::firstOrCreate(['phone' => '8999999999'], [
+            'name' => 'Demo Partner',
+            'role' => 'DELIVERY_PARTNER',
+            'password' => config('dailzo.seed_admin_password'),
+        ]);
+        DeliveryPartner::firstOrCreate(['user_id' => $partnerUser->id], [
+            'vendor_id' => $vendor->id,
+            'name' => 'Demo Partner',
+            'phone' => '8999999999',
             'is_active' => true,
         ]);
 
@@ -71,10 +95,6 @@ class DatabaseSeeder extends Seeder
                     'images' => [],
                 ],
             );
-        }
-
-        foreach (['121001', '121002', '121003', '110001'] as $pincode) {
-            ServicePincode::firstOrCreate(['pincode' => $pincode], ['is_active' => true]);
         }
     }
 }

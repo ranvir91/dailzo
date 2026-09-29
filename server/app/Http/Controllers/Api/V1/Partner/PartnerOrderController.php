@@ -19,9 +19,7 @@ class PartnerOrderController extends Controller
 {
     private const WITH = ['order.user', 'order.address', 'order.items.product', 'order.comments.deliveryPartner'];
 
-    public function __construct(private readonly OtpService $otp)
-    {
-    }
+    public function __construct(private readonly OtpService $otp) {}
 
     /**
      * Forward-only: a partner can hand an order off (OUT_FOR_DELIVERY) then
@@ -44,7 +42,7 @@ class PartnerOrderController extends Controller
         $status = $data['status'] ?? 'ALL';
 
         $query = DeliveryAssignment::with(self::WITH)
-            ->where('delivery_partner_id', $request->user()->id)
+            ->where('delivery_partner_id', $this->currentPartner($request)->id)
             ->whereBetween('created_at', [$dayStart, $dayEnd]);
 
         match ($status) {
@@ -111,7 +109,9 @@ class PartnerOrderController extends Controller
             }
         }
 
-        DB::transaction(function () use ($order, $assignment, $targetAssignmentStatus, $data, $request) {
+        $currentPartnerId = $this->currentPartner($request)->id;
+
+        DB::transaction(function () use ($order, $assignment, $targetAssignmentStatus, $data, $currentPartnerId) {
             $assignment->markStatus($targetAssignmentStatus);
 
             // Terminal Order states (CANCELLED/DELIVERED) are left alone; otherwise
@@ -122,7 +122,7 @@ class PartnerOrderController extends Controller
 
             OrderComment::create([
                 'order_id' => $order->id,
-                'delivery_partner_id' => $request->user()->id,
+                'delivery_partner_id' => $currentPartnerId,
                 'type' => OrderComment::TYPE_STATUS_CHANGE,
                 'body' => trim("Marked as {$targetAssignmentStatus}. ".($data['comment'] ?? '')),
             ]);
@@ -154,7 +154,7 @@ class PartnerOrderController extends Controller
 
         $comment = OrderComment::create([
             'order_id' => $order->id,
-            'delivery_partner_id' => $request->user()->id,
+            'delivery_partner_id' => $this->currentPartner($request)->id,
             'type' => OrderComment::TYPE_INCIDENT,
             'body' => $data['comment'],
         ]);
@@ -169,8 +169,7 @@ class PartnerOrderController extends Controller
             'reason' => ['required', 'string'],
         ]);
 
-        /** @var DeliveryPartner $partner */
-        $partner = $request->user();
+        $partner = $this->currentPartner($request);
 
         if ($data['target_partner_id'] === $partner->id) {
             return ApiResponse::error('Cannot reassign an order to yourself', ['Invalid target partner'], 400);
@@ -210,7 +209,7 @@ class PartnerOrderController extends Controller
 
     /**
      * @return array{0: ?Order, 1: ?DeliveryAssignment} the order and the requesting
-     * partner's active assignment on it, or [null, null] if either doesn't exist.
+     *                                                  partner's active assignment on it, or [null, null] if either doesn't exist.
      */
     private function findOwnedOrder(Request $request, string $orderId): array
     {
@@ -219,12 +218,22 @@ class PartnerOrderController extends Controller
             return [null, null];
         }
 
-        $assignment = $request->user()->activeAssignmentFor($order);
+        $assignment = $this->currentPartner($request)->activeAssignmentFor($order);
         if (! $assignment) {
             return [null, null];
         }
 
         return [$order, $assignment];
+    }
+
+    /**
+     * The DeliveryPartner profile linked to the authenticated User. PartnerOnly
+     * middleware already guarantees this exists and is active before any
+     * action method here runs.
+     */
+    private function currentPartner(Request $request): DeliveryPartner
+    {
+        return $request->user()->deliveryPartnerProfile;
     }
 
     private function present(DeliveryAssignment $assignment): array

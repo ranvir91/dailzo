@@ -23,7 +23,7 @@ class PartnerSearchController extends Controller
         }
 
         $partners = DeliveryPartner::active()
-            ->where('id', '!=', $request->user()->id)
+            ->where('id', '!=', $request->user()->deliveryPartnerProfile->id)
             ->where(fn ($q) => $q->where('name', 'like', "%{$term}%")->orWhere('phone', 'like', "%{$term}%"))
             ->orderBy('name')
             ->limit(20)

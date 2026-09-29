@@ -4,24 +4,45 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Coupon;
+use App\Models\CouponUsage;
 use App\Services\CouponService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class CouponController extends Controller
 {
-    public function __construct(private readonly CouponService $coupons)
-    {
-    }
+    public function __construct(private readonly CouponService $coupons) {}
 
-    /** Public — active, in-window coupons for the storefront. */
+    /**
+     * Public — active, in-window coupons for the storefront. Not behind
+     * auth:sanctum (guests browse coupons before logging in), but resolves
+     * the caller via the sanctum guard directly when a token is present, so
+     * each coupon can carry how many times *this* user has already used it
+     * — the client needs that to grey out a coupon once per_user_limit is
+     * hit; the API request that actually redeems the coupon still enforces
+     * the limit itself regardless of what the client shows.
+     */
     public function index(): JsonResponse
     {
-        return ApiResponse::success(
-            Coupon::active()->orderByDesc('created_at')->get(),
-            'Coupons fetched successfully',
-        );
+        $coupons = Coupon::active()->orderByDesc('created_at')->get();
+
+        $user = Auth::guard('sanctum')->user();
+        $usageCounts = $user
+            ? CouponUsage::where('user_id', $user->id)
+                ->whereIn('coupon_id', $coupons->pluck('id'))
+                ->selectRaw('coupon_id, count(*) as count')
+                ->groupBy('coupon_id')
+                ->pluck('count', 'coupon_id')
+            : collect();
+
+        $data = $coupons->map(fn (Coupon $coupon) => [
+            ...$coupon->toArray(),
+            'usedByUser' => (int) ($usageCounts[$coupon->id] ?? 0),
+        ]);
+
+        return ApiResponse::success($data, 'Coupons fetched successfully');
     }
 
     /** Admin — every non-deleted coupon. */

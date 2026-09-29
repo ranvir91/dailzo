@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\Coupon;
+use App\Models\User;
 use Carbon\CarbonImmutable;
 
 /**
@@ -109,5 +111,57 @@ class CouponService
         }
 
         return $data;
+    }
+
+    /**
+     * Validates a coupon code against every rule it carries (active/date
+     * window, min order value, first-order-only, usage_limit, per_user_limit)
+     * and computes the discount for the given subtotal. Call this inside the
+     * same DB transaction that creates the order — it locks the coupon row so
+     * two concurrent checkouts by the same user can't both slip past
+     * per_user_limit.
+     *
+     * @return array{coupon: ?Coupon, discount: float}
+     */
+    public function resolveForCheckout(?string $code, User $user, float $subtotal): array
+    {
+        $code = trim((string) $code);
+        if ($code === '') {
+            return ['coupon' => null, 'discount' => 0.0];
+        }
+
+        $fail = fn (string $message) => abort(400, $message);
+
+        $coupon = Coupon::active()->where('code', strtoupper($code))->lockForUpdate()->first();
+        if (! $coupon) {
+            $fail('This coupon is invalid or no longer active');
+        }
+
+        if ($subtotal < (float) $coupon->min_order_value) {
+            $fail("Minimum order value for this coupon is ₹{$coupon->min_order_value}");
+        }
+
+        if ($coupon->first_order_only && $user->orders()->exists()) {
+            $fail('This coupon is valid only on your first order');
+        }
+
+        if ($coupon->usage_limit !== null && $coupon->usages()->count() >= $coupon->usage_limit) {
+            $fail('This coupon has reached its usage limit');
+        }
+
+        if ($coupon->per_user_limit !== null
+            && $coupon->usages()->where('user_id', $user->id)->count() >= $coupon->per_user_limit) {
+            $fail('You have already used this coupon the maximum number of times');
+        }
+
+        $discount = $coupon->type === 'PERCENTAGE'
+            ? $subtotal * ((float) $coupon->discount / 100)
+            : (float) $coupon->discount;
+
+        if ($coupon->type === 'PERCENTAGE' && $coupon->max_discount_amount !== null) {
+            $discount = min($discount, (float) $coupon->max_discount_amount);
+        }
+
+        return ['coupon' => $coupon, 'discount' => round(min($discount, $subtotal), 2)];
     }
 }

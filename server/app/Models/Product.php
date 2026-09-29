@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Storage;
 
 class Product extends Model
 {
@@ -14,6 +15,20 @@ class Product extends Model
     use HasUuids;
     use SerializesToCamelCase;
     use SoftDeletes;
+
+    protected static function booted(): void
+    {
+        // Deleting a product here is a soft delete (see ProductResource),
+        // and there's no restore/force-delete action exposed in Atlas, so a
+        // deleted product's images are just dead weight from then on — this
+        // fires on both soft and force delete, and Storage::delete() on an
+        // already-missing file is a harmless no-op either way.
+        static::deleting(function (Product $product) {
+            if (! empty($product->images)) {
+                Storage::disk('web')->delete($product->images);
+            }
+        });
+    }
 
     protected $fillable = [
         'name',

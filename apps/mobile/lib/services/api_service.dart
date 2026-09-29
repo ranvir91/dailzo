@@ -14,6 +14,21 @@ import '../models/serviceable_pincode.dart';
 import '../models/user_profile.dart';
 import 'session_store.dart';
 
+/// Thrown for every error this service raises (bad responses, missing
+/// session, malformed payloads, ...). `toString()` returns just the message
+/// — screens interpolate `$error` straight into SnackBars, and the plain
+/// `Exception` class's default `toString()` prepends "Exception: ", which
+/// leaked into user-facing text (e.g. "Checkout failed: Exception: You have
+/// already used this coupon...").
+class ApiException implements Exception {
+  ApiException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 class ApiService {
   ApiService._();
 
@@ -108,7 +123,7 @@ class ApiService {
     );
     final session = AuthSession.fromJson(json);
     if (session.accessToken.isEmpty) {
-      throw Exception('Login succeeded but access token is missing.');
+      throw ApiException('Login succeeded but access token is missing.');
     }
     _session = session;
     await _store.writeSession(session);
@@ -151,7 +166,7 @@ class ApiService {
       );
       final data = json['data'];
       if (data is! Map<String, dynamic>) {
-        throw Exception('Profile update response is invalid.');
+        throw ApiException('Profile update response is invalid.');
       }
       return UserProfile.fromJson(data);
     } catch (error) {
@@ -171,7 +186,7 @@ class ApiService {
     );
     final fallbackData = fallbackJson['data'];
     if (fallbackData is! Map<String, dynamic>) {
-      throw Exception('Profile update response is invalid.');
+      throw ApiException('Profile update response is invalid.');
     }
     return UserProfile.fromJson(fallbackData);
   }
@@ -272,7 +287,7 @@ class ApiService {
     );
     final data = json['data'];
     if (data is! Map<String, dynamic>) {
-      throw Exception('Address creation response is invalid.');
+      throw ApiException('Address creation response is invalid.');
     }
     return Address.fromJson(data);
   }
@@ -298,7 +313,7 @@ class ApiService {
     );
     final data = json['data'];
     if (data is! Map<String, dynamic>) {
-      throw Exception('Address update response is invalid.');
+      throw ApiException('Address update response is invalid.');
     }
     return Address.fromJson(data);
   }
@@ -318,7 +333,7 @@ class ApiService {
     final json = await _request(method: 'GET', path: '/orders/$id');
     final data = json['data'];
     if (data is! Map<String, dynamic>) {
-      throw Exception('Order details unavailable for $id.');
+      throw ApiException('Order details unavailable for $id.');
     }
     return Order.fromJson(data);
   }
@@ -350,9 +365,10 @@ class ApiService {
     required String paymentMethod,
     required double total,
     required List<CartItem> items,
+    String? couponCode,
   }) async {
     if (items.isEmpty) {
-      throw Exception('Cart is empty. Add items before checkout.');
+      throw ApiException('Cart is empty. Add items before checkout.');
     }
 
     final userId = await _resolveCheckoutUserId();
@@ -365,6 +381,9 @@ class ApiService {
               {'productId': item.productId, 'quantity': item.quantity})
           .toList(),
     };
+    if (couponCode != null && couponCode.isNotEmpty) {
+      payload['couponCode'] = couponCode;
+    }
     if (userId.isNotEmpty) {
       payload['userId'] = userId;
     }
@@ -372,7 +391,7 @@ class ApiService {
     final json = await _request(method: 'POST', path: '/orders', body: payload);
     final data = json['data'];
     if (data is! Map<String, dynamic>) {
-      throw Exception('Order creation response is invalid.');
+      throw ApiException('Order creation response is invalid.');
     }
     return Order.fromJson(data);
   }
@@ -383,12 +402,12 @@ class ApiService {
     }
 
     if (!isAuthenticated) {
-      throw Exception('Please login before placing the order.');
+      throw ApiException('Please login before placing the order.');
     }
 
     final profile = await fetchProfile();
     if (profile == null || profile.id.isEmpty) {
-      throw Exception('Unable to identify user for order creation.');
+      throw ApiException('Unable to identify user for order creation.');
     }
 
     _session = AuthSession(
@@ -421,7 +440,7 @@ class ApiService {
     bool authRequired = false,
   }) async {
     if (authRequired && !isAuthenticated) {
-      throw Exception('Please login first.');
+      throw ApiException('Please login first.');
     }
 
     final uri = Uri.parse('${AppEnv.baseUrl}$path');
@@ -451,16 +470,16 @@ class ApiService {
         response = await _client.delete(uri, headers: headers);
         break;
       default:
-        throw Exception('Unsupported method $method');
+        throw ApiException('Unsupported method $method');
     }
 
     if (response.body.isEmpty) {
-      throw Exception('Empty response from $path.');
+      throw ApiException('Empty response from $path.');
     }
 
     final dynamic decoded = jsonDecode(response.body);
     if (decoded is! Map<String, dynamic>) {
-      throw Exception('Invalid response from $path.');
+      throw ApiException('Invalid response from $path.');
     }
 
     if (response.statusCode < 200 ||
@@ -468,9 +487,9 @@ class ApiService {
         decoded['success'] == false) {
       final errors = decoded['errors'];
       if (errors is List && errors.isNotEmpty) {
-        throw Exception(errors.first.toString());
+        throw ApiException(errors.first.toString());
       }
-      throw Exception(
+      throw ApiException(
           decoded['message']?.toString() ?? 'Request failed for $path');
     }
 

@@ -58,8 +58,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.local_shipping_outlined,
-                        size: 40, color: colorScheme.primary),
+                    Image.asset('assets/branding/Dailzo_logo.png',
+                        height: 40, fit: BoxFit.contain),
                     const SizedBox(height: 12),
                     Text(
                       'Dailzo Partner',

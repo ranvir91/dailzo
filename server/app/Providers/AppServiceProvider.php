@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use Dedoc\Scramble\Scramble;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -12,7 +13,14 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        // Must run in register(), not boot(): Scramble's own service provider
+        // reads this flag during ITS boot() to decide whether to register its
+        // default /docs/api routes, and Laravel runs every provider's
+        // register() before any provider's boot(). Setting it here — rather
+        // than in routes/web.php, which loads after all providers boot — is
+        // what actually suppresses /docs/api before it's baked in, so only
+        // our /docs route (registered in routes/web.php) exists.
+        Scramble::ignoreDefaultRoutes();
     }
 
     public function boot(): void

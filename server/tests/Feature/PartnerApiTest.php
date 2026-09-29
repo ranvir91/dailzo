@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\DeliveryAssignment;
 use App\Models\DeliveryPartner;
 use App\Models\Order;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -14,7 +15,18 @@ class PartnerApiTest extends TestCase
 
     public function test_login_succeeds_with_the_right_password_and_fails_otherwise(): void
     {
-        $partner = DeliveryPartner::factory()->create(['phone' => '8100000001', 'password' => 'secret123']);
+        // phone/password are the login now (a linked User), so both the
+        // DeliveryPartner row's own phone and the paired User's phone/password
+        // need setting — the DeliveryPartner-level `phone` override alone
+        // wouldn't reach the row that actually authenticates.
+        $partner = DeliveryPartner::factory()->create([
+            'phone' => '8100000001',
+            'user_id' => User::factory()->state([
+                'phone' => '8100000001',
+                'password' => 'secret123',
+                'role' => 'DELIVERY_PARTNER',
+            ]),
+        ]);
 
         $this->postJson('/api/v1/partner/login', ['phone_number' => '8100000001', 'password' => 'wrong'])
             ->assertStatus(401)
@@ -33,7 +45,14 @@ class PartnerApiTest extends TestCase
 
     public function test_inactive_partner_cannot_log_in(): void
     {
-        DeliveryPartner::factory()->inactive()->create(['phone' => '8100000002', 'password' => 'secret123']);
+        DeliveryPartner::factory()->inactive()->create([
+            'phone' => '8100000002',
+            'user_id' => User::factory()->state([
+                'phone' => '8100000002',
+                'password' => 'secret123',
+                'role' => 'DELIVERY_PARTNER',
+            ]),
+        ]);
 
         $this->postJson('/api/v1/partner/login', ['phone_number' => '8100000002', 'password' => 'secret123'])
             ->assertStatus(401);
@@ -250,7 +269,7 @@ class PartnerApiTest extends TestCase
 
     public function test_customer_token_cannot_access_partner_routes(): void
     {
-        $this->actingAsUser(\App\Models\User::factory()->create())
+        $this->actingAsUser(User::factory()->create())
             ->getJson('/api/v1/partner/orders')
             ->assertStatus(403);
     }

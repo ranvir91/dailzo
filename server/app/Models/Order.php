@@ -32,9 +32,13 @@ class Order extends Model
 
     protected $fillable = [
         'user_id',
+        'vendor_id',
         'status',
         'payment_method',
         'total',
+        'coupon_id',
+        'discount_amount',
+        'delivery_charges',
         'address_id',
     ];
 
@@ -42,6 +46,8 @@ class Order extends Model
     {
         return [
             'total' => 'decimal:2',
+            'delivery_charges' => 'decimal:2',
+            'discount_amount' => 'decimal:2',
         ];
     }
 
@@ -63,6 +69,16 @@ class Order extends Model
     public function address()
     {
         return $this->belongsTo(Address::class);
+    }
+
+    public function vendor()
+    {
+        return $this->belongsTo(Vendor::class);
+    }
+
+    public function coupon()
+    {
+        return $this->belongsTo(Coupon::class);
     }
 
     public function items()

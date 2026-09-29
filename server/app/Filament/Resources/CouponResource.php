@@ -53,14 +53,34 @@ class CouponResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn (Builder $query) => $query->withCount('usages'))
             ->columns([
                 Tables\Columns\TextColumn::make('code')->searchable()->weight('bold'),
+                Tables\Columns\TextColumn::make('description')->limit(40)
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('type')->badge(),
                 Tables\Columns\TextColumn::make('discount')
                     ->formatStateUsing(fn ($state, Coupon $r) => $r->type === 'PERCENTAGE' ? "{$state}%" : "₹{$state}"),
+                Tables\Columns\TextColumn::make('max_discount_amount')->money('INR')
+                    ->label('Max discount')->placeholder('No cap')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('min_order_value')->money('INR')->label('Min order')->toggleable(),
-                Tables\Columns\TextColumn::make('expires_at')->date()->placeholder('No expiry')->sortable(),
+                Tables\Columns\TextColumn::make('starts_at')->date()->label('Valid from')
+                    ->placeholder('Immediately')->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('expires_at')->date()->label('Valid till')
+                    ->placeholder('No expiry')->sortable(),
+                Tables\Columns\TextColumn::make('usages_count')
+                    ->label('Usage')
+                    ->formatStateUsing(fn ($state, Coupon $r) => "{$state} / ".($r->usage_limit ?? '∞'))
+                    ->sortable()
+                    ->tooltip('Total redemptions so far / usage limit'),
+                Tables\Columns\TextColumn::make('per_user_limit')->label('Per-user limit')
+                    ->placeholder('Unlimited')->toggleable(),
+                Tables\Columns\IconColumn::make('first_order_only')->label('First order only')->boolean(),
                 Tables\Columns\ToggleColumn::make('is_active'),
+                Tables\Columns\TextColumn::make('created_at')->dateTime()->label('Created')
+                    ->sortable()->toggleable(isToggledHiddenByDefault: true),
             ])
             ->defaultSort('created_at', 'desc')
             ->filters([
