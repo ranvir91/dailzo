@@ -8,6 +8,7 @@ import '../models/auth_session.dart';
 import '../models/cart.dart';
 import '../models/category.dart';
 import '../models/coupon.dart';
+import '../models/offer.dart';
 import '../models/order.dart';
 import '../models/product.dart';
 import '../models/serviceable_pincode.dart';
@@ -166,7 +167,7 @@ class ApiService {
       );
       final data = json['data'];
       if (data is! Map<String, dynamic>) {
-        throw ApiException('Profile update response is invalid.');
+        throw ApiException(_profileUpdateFailureMessage(json));
       }
       return UserProfile.fromJson(data);
     } catch (error) {
@@ -186,9 +187,20 @@ class ApiService {
     );
     final fallbackData = fallbackJson['data'];
     if (fallbackData is! Map<String, dynamic>) {
-      throw ApiException('Profile update response is invalid.');
+      throw ApiException(_profileUpdateFailureMessage(fallbackJson));
     }
     return UserProfile.fromJson(fallbackData);
+  }
+
+  /// The server still returns `success: true` with a null `data` for cases
+  /// like "user not found" (see UserController), so it never trips
+  /// `_request()`'s own error handling — this is the last point that still
+  /// has the original response's `message` (e.g. "User not found") to show
+  /// instead of a bare technical "response is invalid" string.
+  String _profileUpdateFailureMessage(Map<String, dynamic> json) {
+    final message = json['message']?.toString().trim();
+    if (message != null && message.isNotEmpty) return message;
+    return 'We couldn\'t update your profile right now. Please try again.';
   }
 
   Future<String> getHealth() async {
@@ -343,6 +355,13 @@ class ApiService {
     final data = json['data'];
     if (data is! List) return const [];
     return data.whereType<Map<String, dynamic>>().map(Coupon.fromJson).toList();
+  }
+
+  Future<List<Offer>> fetchOffers() async {
+    final json = await _request(method: 'GET', path: '/offers');
+    final data = json['data'];
+    if (data is! List) return const [];
+    return data.whereType<Map<String, dynamic>>().map(Offer.fromJson).toList();
   }
 
   Future<List<ServiceablePincode>> fetchServiceablePincodes() async {

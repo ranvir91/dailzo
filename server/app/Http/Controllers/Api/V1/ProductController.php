@@ -112,7 +112,7 @@ class ProductController extends Controller
             'name' => [$creating ? 'required' : 'sometimes', 'string'],
             'description' => ['sometimes', 'nullable', 'string'],
             'category' => ['sometimes', 'nullable', 'string'],
-            'categoryId' => ['sometimes', 'nullable', 'string'],
+            'categoryId' => ['sometimes', 'nullable', 'integer'],
             'price' => [$creating ? 'required' : 'sometimes', 'numeric', 'min:0'],
             'discountedPrice' => ['sometimes', 'nullable'],
             'stock' => [$creating ? 'required' : 'sometimes', 'integer', 'min:0'],

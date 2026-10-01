@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:speech_to_text/speech_recognition_result.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 
 import 'models/address.dart';
 import 'models/cart.dart';
 import 'models/category.dart';
 import 'models/coupon.dart';
+import 'models/offer.dart';
 import 'models/order.dart';
 import 'models/product.dart';
 import 'models/serviceable_pincode.dart';
@@ -97,11 +100,17 @@ class _HomeScreenState extends State<HomeScreen> {
   String _selectedCategoryId = 'all';
   String _selectedPincode = '';
 
+  final _searchController = TextEditingController();
+  final _speech = SpeechToText();
+  bool _speechAvailable = false;
+  bool _isListening = false;
+
   List<Category> _categories = const [];
   List<Product> _products = const [];
   Cart _cart = Cart(id: '', items: const []);
   List<Address> _addresses = const [];
   List<Coupon> _coupons = const [];
+  List<Offer> _offers = const [];
   List<Order> _orders = const [];
   List<ServiceablePincode> _serviceablePincodes = const [];
   UserProfile? _profile;
@@ -113,6 +122,63 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadData();
+    _speech.initialize().then((available) {
+      if (mounted) setState(() => _speechAvailable = available);
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _speech.stop();
+    super.dispose();
+  }
+
+  /// Toggles voice search: starts listening on the mic tap, or stops early
+  /// on a second tap. Recognized speech replaces the search box text as the
+  /// same box the user would otherwise type into, so it flows through the
+  /// existing client-side `_filteredProducts()` filtering unchanged.
+  Future<void> _toggleVoiceSearch() async {
+    if (_isListening) {
+      await _speech.stop();
+      if (mounted) setState(() => _isListening = false);
+      return;
+    }
+
+    if (!_speechAvailable) {
+      final available = await _speech.initialize();
+      if (!mounted) return;
+      setState(() => _speechAvailable = available);
+      if (!available) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Voice search is unavailable. Check microphone permission in your device settings.'),
+          ),
+        );
+        return;
+      }
+    }
+
+    setState(() => _isListening = true);
+    await _speech.listen(
+      onResult: (SpeechRecognitionResult result) {
+        if (!mounted) return;
+        _searchController.text = result.recognizedWords;
+        _searchController.selection = TextSelection.fromPosition(
+          TextPosition(offset: _searchController.text.length),
+        );
+        setState(() {
+          _searchText = result.recognizedWords;
+          if (result.finalResult) _isListening = false;
+        });
+      },
+      listenOptions: SpeechListenOptions(
+        partialResults: true,
+        listenFor: const Duration(seconds: 10),
+        pauseFor: const Duration(seconds: 3),
+      ),
+    );
   }
 
   Future<void> _loadData() async {
@@ -142,6 +208,7 @@ class _HomeScreenState extends State<HomeScreen> {
         authenticated ? ApiService.instance.fetchProfile() : Future.value(null),
         ApiService.instance.fetchServiceablePincodes(),
         ApiService.instance.fetchStoreSettings(),
+        ApiService.instance.fetchOffers(),
       ]);
       if (!mounted) return;
       final pincodes = results[7] as List<ServiceablePincode>;
@@ -159,6 +226,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _orders = results[5] as List<Order>;
         _profile = results[6] as UserProfile?;
         _serviceablePincodes = pincodes;
+        _offers = results[9] as List<Offer>;
         _minOrderValueEnabled = storeSettings.minOrderValueEnabled;
         _minOrderValue = storeSettings.minOrderValue;
         _deliveryCharges = storeSettings.deliveryCharges;
@@ -329,6 +397,7 @@ class _HomeScreenState extends State<HomeScreen> {
           minOrderValueEnabled: _minOrderValueEnabled,
           minOrderValue: _minOrderValue,
           deliveryCharges: _deliveryCharges,
+          onAddAddress: _addAddressFromCheckout,
           onOrderPlaced: () async {
             await _refreshCart();
             await _refreshOrders();
@@ -618,6 +687,66 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildOffersSection() {
+    return SizedBox(
+      height: 120,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: _offers.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        itemBuilder: (context, index) {
+          final offer = _offers[index];
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              width: 260,
+              color: Theme.of(context).colorScheme.primaryContainer,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (offer.imageUrl.isNotEmpty)
+                    Image.network(
+                      offer.imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(12, 20, 12, 10),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0),
+                            Colors.black.withValues(alpha: 0.55),
+                          ],
+                        ),
+                      ),
+                      child: Text(
+                        offer.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildHomePage() {
     final products = _filteredProducts();
     return RefreshIndicator(
@@ -626,10 +755,19 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
         children: [
           TextField(
+            controller: _searchController,
             decoration: InputDecoration(
-              hintText: 'Search "magazine"',
+              hintText:
+                  _isListening ? 'Listening...' : 'Search "Healthy snacks"',
               prefixIcon: const Icon(Icons.search),
-              suffixIcon: const Icon(Icons.mic_none),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _isListening ? Icons.mic : Icons.mic_none,
+                  color: _isListening ? Theme.of(context).colorScheme.primary : null,
+                ),
+                tooltip: 'Voice search',
+                onPressed: _toggleVoiceSearch,
+              ),
               filled: true,
               fillColor: Colors.white,
               border: OutlineInputBorder(
@@ -640,6 +778,10 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 10),
           _buildCategoryIcons(),
+          if (_offers.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _buildOffersSection(),
+          ],
           const SizedBox(height: 10),
           if (products.isEmpty)
             const Padding(
@@ -825,72 +967,86 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Widget _buildProfileScreen() {
+    return ProfileScreen(
+      profile: _profile,
+      addresses: _addresses,
+      onReload: _loadData,
+      onSaveProfile: ({
+        required String name,
+        required String phone,
+        required String gender,
+      }) async {
+        final updated = await ApiService.instance.updateProfile(
+          name: name,
+          phone: phone,
+          gender: gender,
+        );
+        if (mounted) setState(() => _profile = updated);
+        await _loadData();
+        return updated;
+      },
+      onAddAddress: ({
+        required String label,
+        required String line1,
+        required String city,
+        required String pincode,
+        required bool isDefault,
+      }) async {
+        final address = await ApiService.instance.createAddress(
+          label: label,
+          line1: line1,
+          city: city,
+          pincode: pincode,
+          isDefault: isDefault,
+        );
+        await _loadData();
+        return address;
+      },
+      onUpdateAddress: ({
+        required String id,
+        required String label,
+        required String line1,
+        required String city,
+        required String pincode,
+        required bool isDefault,
+      }) async {
+        final address = await ApiService.instance.updateAddress(
+          id: id,
+          label: label,
+          line1: line1,
+          city: city,
+          pincode: pincode,
+          isDefault: isDefault,
+        );
+        await _loadData();
+        return address;
+      },
+      onDeleteAddress: (String id) async {
+        await ApiService.instance.deleteAddress(id);
+        await _loadData();
+      },
+      onLogout: () async => widget.onLogout(),
+    );
+  }
+
   Future<void> _openProfile() async {
     final ok = await _ensureLoggedIn(message: 'Login to view your profile.');
     if (!ok || !mounted) return;
     await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ProfileScreen(
-          profile: _profile,
-          addresses: _addresses,
-          onReload: _loadData,
-          onSaveProfile: ({
-            required String name,
-            required String phone,
-            required String gender,
-          }) async {
-            final updated = await ApiService.instance.updateProfile(
-              name: name,
-              phone: phone,
-              gender: gender,
-            );
-            if (mounted) setState(() => _profile = updated);
-            await _loadData();
-            return updated;
-          },
-          onAddAddress: ({
-            required String label,
-            required String line1,
-            required String city,
-            required String pincode,
-            required bool isDefault,
-          }) async {
-            final address = await ApiService.instance.createAddress(
-              label: label,
-              line1: line1,
-              city: city,
-              pincode: pincode,
-              isDefault: isDefault,
-            );
-            await _loadData();
-            return address;
-          },
-          onUpdateAddress: ({
-            required String id,
-            required String label,
-            required String line1,
-            required String city,
-            required String pincode,
-            required bool isDefault,
-          }) async {
-            final address = await ApiService.instance.updateAddress(
-              id: id,
-              label: label,
-              line1: line1,
-              city: city,
-              pincode: pincode,
-              isDefault: isDefault,
-            );
-            await _loadData();
-            return address;
-          },
-          onDeleteAddress: (String id) async {
-            await ApiService.instance.deleteAddress(id);
-            await _loadData();
-          },
-          onLogout: () async => widget.onLogout(),
-        ),
-      ),
+      MaterialPageRoute(builder: (_) => _buildProfileScreen()),
+    );
+    if (!mounted) return;
+    await _loadData();
+  }
+
+  /// Opens the profile screen's address section (same screen/dialogs as
+  /// "Profile > Addresses" — nothing new to build or keep in sync) and
+  /// refreshes the caller's data once the user comes back, so a freshly
+  /// added address is available immediately.
+  Future<void> _addAddressFromCheckout() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => _buildProfileScreen()),
     );
     if (!mounted) return;
     await _loadData();

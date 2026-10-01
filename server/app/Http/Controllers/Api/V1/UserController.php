@@ -76,7 +76,7 @@ class UserController extends Controller
 
     public function destroy(Request $request, string $id): JsonResponse
     {
-        if ($request->user()->id === $id) {
+        if ($request->user()->id === (int) $id) {
             return ApiResponse::success(null, 'You cannot delete your own account');
         }
 
@@ -92,6 +92,6 @@ class UserController extends Controller
 
     private function canActOn(Request $request, string $id): bool
     {
-        return $request->user()->id === $id || $request->user()->isAdmin();
+        return $request->user()->id === (int) $id || $request->user()->isAdmin();
     }
 }

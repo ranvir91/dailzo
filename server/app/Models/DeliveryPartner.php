@@ -4,7 +4,6 @@ namespace App\Models;
 
 use App\Models\Concerns\SyncsDeliveryPartnerUser;
 use App\Support\SerializesToCamelCase;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -23,7 +22,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class DeliveryPartner extends Model
 {
     use HasFactory;
-    use HasUuids;
     use SerializesToCamelCase;
     use SoftDeletes;
     use SyncsDeliveryPartnerUser;

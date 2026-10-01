@@ -11,9 +11,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('partner_refresh_tokens', function (Blueprint $table) {
-            $table->uuid('id')->primary();
+            $table->id();
             $table->string('token')->unique();
-            $table->foreignUuid('delivery_partner_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('delivery_partner_id')->constrained()->cascadeOnDelete();
             $table->timestamp('expires_at');
             $table->timestamps();
         });

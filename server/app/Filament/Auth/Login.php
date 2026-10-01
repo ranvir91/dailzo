@@ -41,9 +41,10 @@ class Login extends BaseLogin
         $user = User::where('email', $login)->orWhere('phone', $login)->first();
 
         return [
-            // No match: an id that can never exist, so Auth::attempt() simply
-            // fails to find a row rather than needing a separate early return.
-            'id' => $user?->id ?? '00000000-0000-0000-0000-000000000000',
+            // No match: an id that can never exist (ids are auto-increment
+            // starting at 1), so Auth::attempt() simply fails to find a row
+            // rather than needing a separate early return.
+            'id' => $user?->id ?? 0,
             'password' => $data['password'],
         ];
     }

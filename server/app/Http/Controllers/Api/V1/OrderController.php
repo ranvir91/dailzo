@@ -21,7 +21,7 @@ class OrderController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'addressId' => ['sometimes', 'nullable', 'string'],
+            'addressId' => ['sometimes', 'nullable', 'integer'],
             'paymentMethod' => ['required', 'string'],
             // Kept for backward compatibility with older app builds; no
             // longer trusted for the order total (see below) — a client
@@ -29,7 +29,7 @@ class OrderController extends Controller
             'total' => ['required', 'numeric'],
             'couponCode' => ['sometimes', 'nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.productId' => ['required', 'string'],
+            'items.*.productId' => ['required', 'integer'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
         ]);
 

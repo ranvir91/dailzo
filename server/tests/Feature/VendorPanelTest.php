@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Octa\Resources\DeliveryPartnerResource as OctaDeliveryPartnerResource;
 use App\Filament\Octa\Resources\DeliveryPartnerResource\Pages\ManageDeliveryPartners as OctaManageDeliveryPartners;
+use App\Filament\Octa\Resources\OrderResource as OctaOrderResource;
 use App\Filament\Octa\Resources\OrderResource\Pages\ListOrders as OctaListOrders;
 use App\Filament\Octa\Widgets\RecentOrders;
 use App\Filament\Octa\Widgets\VendorOverview;
@@ -238,6 +240,19 @@ class VendorPanelTest extends TestCase
         $this->assertTrue($vendorUser->canAccessPanel(Filament::getPanel('octa')));
     }
 
+    public function test_the_vendors_list_number_column_is_the_vendors_id_not_a_separate_vendor_number(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->actingAs($this->admin());
+
+        $vendor = Vendor::factory()->create();
+
+        $this->assertArrayNotHasKey('vendor_number', $vendor->getAttributes());
+
+        Livewire::test(ManageVendors::class)
+            ->assertSee((string) $vendor->id);
+    }
+
     public function test_superadmin_can_assign_a_vendor_and_override_the_delivery_partner_in_atlas(): void
     {
         Filament::setCurrentPanel(Filament::getPanel('admin'));
@@ -303,6 +318,22 @@ class VendorPanelTest extends TestCase
 
         Livewire::test(RecentOrders::class)
             ->assertCanSeeTableRecords([$mine]);
+    }
+
+    public function test_octa_dashboard_tiles_and_recent_orders_rows_link_to_their_pages(): void
+    {
+        $vendor = Vendor::factory()->create();
+        DeliveryPartner::factory()->create(['vendor_id' => $vendor->id]);
+        $order = Order::factory()->create(['vendor_id' => $vendor->id]);
+
+        $this->actingAs($vendor->user);
+
+        Livewire::test(VendorOverview::class)
+            ->assertSeeHtml(OctaOrderResource::getUrl())
+            ->assertSeeHtml(OctaDeliveryPartnerResource::getUrl());
+
+        Livewire::test(RecentOrders::class)
+            ->assertSeeHtml(OctaOrderResource::getUrl('view', ['record' => $order]));
     }
 
     public function test_superadmin_can_list_a_serviceable_pincode_with_an_area_name(): void

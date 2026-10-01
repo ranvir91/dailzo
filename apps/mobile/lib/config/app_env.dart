@@ -1,7 +1,7 @@
 class AppEnv {
   static const String apiScheme = String.fromEnvironment('API_SCHEME', defaultValue: 'http');
   static const String apiHost = String.fromEnvironment('API_HOST', defaultValue: 'localhost');
-  static const String apiPort = String.fromEnvironment('API_PORT', defaultValue: '3000');
+  static const String apiPort = String.fromEnvironment('API_PORT', defaultValue: '8000');
   static const String apiPrefix = String.fromEnvironment('API_PREFIX', defaultValue: '/api/v1');
 
   static String get baseUrl => '$apiScheme://$apiHost:$apiPort$apiPrefix';

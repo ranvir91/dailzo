@@ -5,7 +5,6 @@ import '../config/app_env.dart';
 class Order {
   Order({
     required this.id,
-    required this.orderNumber,
     required this.status,
     required this.total,
     required this.paymentMethod,
@@ -13,15 +12,14 @@ class Order {
   });
 
   final String id;
-  final int orderNumber;
   final String status;
   final double total;
   final String paymentMethod;
   final List<OrderLineItem> items;
 
-  /// Falls back to the raw id for orders from an API response that hasn't
-  /// been updated to include orderNumber yet.
-  String get displayNumber => orderNumber > 0 ? '#$orderNumber' : id;
+  /// The order's own id doubles as its human-facing order number — there's
+  /// no separate orderNumber field on the backend anymore.
+  String get displayNumber => '#$id';
 
   String get displayStatus {
     final normalized = status.trim().toLowerCase().replaceAll('_', ' ');
@@ -55,7 +53,6 @@ class Order {
     final rawItems = json['items'];
     return Order(
       id: json['id']?.toString() ?? 'unknown',
-      orderNumber: int.tryParse(json['orderNumber']?.toString() ?? '0') ?? 0,
       status: json['status']?.toString() ?? 'PENDING',
       total: double.tryParse(json['total']?.toString() ?? '0') ?? 0,
       paymentMethod: json['paymentMethod']?.toString() ?? 'COD',

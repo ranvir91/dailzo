@@ -11,9 +11,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('app_notifications', function (Blueprint $table) {
-            $table->uuid('id')->primary();
-            $table->foreignUuid('user_id')->constrained()->cascadeOnDelete();
-            $table->foreignUuid('order_id')->nullable()->constrained()->nullOnDelete();
+            $table->id();
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('order_id')->nullable()->constrained()->nullOnDelete();
             $table->string('event');
             $table->text('payload')->nullable();
             $table->boolean('sent')->default(false);

@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('delivery_partners', function (Blueprint $table) {
-            $table->uuid('id')->primary();
+            $table->id();
             $table->string('name');
             $table->string('phone')->unique();
             $table->timestamps();
@@ -17,9 +17,9 @@ return new class extends Migration
         });
 
         Schema::create('delivery_assignments', function (Blueprint $table) {
-            $table->uuid('id')->primary();
-            $table->foreignUuid('order_id')->constrained()->cascadeOnDelete();
-            $table->foreignUuid('delivery_partner_id')->constrained()->restrictOnDelete();
+            $table->id();
+            $table->foreignId('order_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('delivery_partner_id')->constrained()->restrictOnDelete();
             $table->string('status')->default('ASSIGNED');
             $table->timestamps();
         });

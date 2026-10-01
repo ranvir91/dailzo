@@ -3,12 +3,10 @@
 namespace App\Models;
 
 use App\Support\SerializesToCamelCase;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 
 class StoreSetting extends Model
 {
-    use HasUuids;
     use SerializesToCamelCase;
 
     /** Defaults used when the settings row does not exist yet. */

@@ -2,12 +2,10 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\AssignsSequentialNumber;
 use App\Support\SerializesToCamelCase;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -16,12 +14,11 @@ use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable implements FilamentUser
 {
-    /** @use HasFactory<UserFactory> */
-    use AssignsSequentialNumber;
-
     use HasApiTokens;
+
+    /** @use HasFactory<UserFactory> */
     use HasFactory;
-    use HasUuids;
+
     use Notifiable;
     use SerializesToCamelCase;
     use SoftDeletes;
@@ -46,11 +43,6 @@ class User extends Authenticatable implements FilamentUser
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
-    }
-
-    public function sequentialNumberColumn(): string
-    {
-        return 'user_number';
     }
 
     public function canAccessPanel(Panel $panel): bool

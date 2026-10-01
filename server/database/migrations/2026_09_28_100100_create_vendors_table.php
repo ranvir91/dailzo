@@ -9,9 +9,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('vendors', function (Blueprint $table) {
-            $table->uuid('id')->primary();
+            $table->id();
             // The vendor's login identity — see users.role = 'VENDOR'.
-            $table->foreignUuid('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             // Human-facing sequential id, same pattern as order_number/user_number.
             $table->unsignedInteger('vendor_number')->nullable()->unique();
             $table->string('business_name');
@@ -31,8 +31,8 @@ return new class extends Migration
         // populated (belongsToMany's sync()/attach() insert the pivot row
         // directly, bypassing model-level id generation).
         Schema::create('vendor_service_pincodes', function (Blueprint $table) {
-            $table->foreignUuid('vendor_id')->constrained()->cascadeOnDelete();
-            $table->foreignUuid('service_pincode_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('vendor_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('service_pincode_id')->constrained()->cascadeOnDelete();
             $table->timestamps();
 
             $table->primary(['vendor_id', 'service_pincode_id']);

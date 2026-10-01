@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('users', function (Blueprint $table) {
-            $table->uuid('id')->primary();
+            $table->id();
             // Human-facing sequential id (was User.userNumber autoincrement in Prisma).
             // Assigned in the model's creating hook since MySQL allows only one
             // auto-increment column and it must be a key.
@@ -39,7 +39,7 @@ return new class extends Migration
 
         Schema::create('sessions', function (Blueprint $table) {
             $table->string('id')->primary();
-            $table->foreignUuid('user_id')->nullable()->index();
+            $table->foreignId('user_id')->nullable()->index();
             $table->string('ip_address', 45)->nullable();
             $table->text('user_agent')->nullable();
             $table->longText('payload');
@@ -47,10 +47,10 @@ return new class extends Migration
         });
 
         Schema::create('refresh_tokens', function (Blueprint $table) {
-            $table->uuid('id')->primary();
+            $table->id();
             // Stores a SHA-256 hash of the token handed to the client, never the raw value.
             $table->string('token')->unique();
-            $table->foreignUuid('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->timestamp('expires_at');
             $table->timestamps();
         });

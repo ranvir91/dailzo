@@ -14,6 +14,7 @@ class CheckoutScreen extends StatefulWidget {
     required this.addresses,
     required this.coupons,
     required this.onOrderPlaced,
+    required this.onAddAddress,
     this.hasPriorOrders = false,
     this.minOrderValueEnabled = false,
     this.minOrderValue = 0,
@@ -25,6 +26,12 @@ class CheckoutScreen extends StatefulWidget {
   final List<Address> addresses;
   final List<Coupon> coupons;
   final Future<void> Function() onOrderPlaced;
+
+  /// Opens the address-management screen; called when the user taps "Add
+  /// address" from the empty-address state below. The caller is
+  /// responsible for the actual add flow (reuses the Profile screen) — this
+  /// screen just refreshes its own address list once that returns.
+  final Future<void> Function() onAddAddress;
   final bool hasPriorOrders;
   final bool minOrderValueEnabled;
   final double minOrderValue;
@@ -39,12 +46,35 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String? _selectedAddressId;
   Coupon? _selectedCoupon;
   bool _isSubmitting = false;
+  bool _loadingAddresses = false;
+  late List<Address> _addresses;
 
   @override
   void initState() {
     super.initState();
-    if (widget.addresses.isNotEmpty) {
-      _selectedAddressId = widget.addresses.firstWhere((address) => address.isDefault, orElse: () => widget.addresses.first).id;
+    _addresses = widget.addresses;
+    _selectDefaultAddress();
+  }
+
+  void _selectDefaultAddress() {
+    if (_addresses.isEmpty) return;
+    _selectedAddressId = _addresses
+        .firstWhere((address) => address.isDefault, orElse: () => _addresses.first)
+        .id;
+  }
+
+  Future<void> _addAddress() async {
+    setState(() => _loadingAddresses = true);
+    try {
+      await widget.onAddAddress();
+      final addresses = await ApiService.instance.fetchAddresses();
+      if (!mounted) return;
+      setState(() {
+        _addresses = addresses;
+        _selectDefaultAddress();
+      });
+    } finally {
+      if (mounted) setState(() => _loadingAddresses = false);
     }
   }
 
@@ -132,18 +162,39 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            if (widget.addresses.isEmpty)
-              const Card(
+            if (_addresses.isEmpty)
+              Card(
                 child: Padding(
-                  padding: EdgeInsets.all(14),
-                  child: Text('No delivery address found in backend. Add one before placing an order.'),
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('No saved delivery address found. Add one before placing an order.'),
+                      const SizedBox(height: 4),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: _loadingAddresses ? null : _addAddress,
+                          icon: _loadingAddresses
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.add_location_alt_outlined, size: 18),
+                          label: const Text('Add delivery address'),
+                          style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               )
             else
               DropdownButtonFormField<String>(
                 initialValue: _selectedAddressId,
                 decoration: const InputDecoration(labelText: 'Delivery address'),
-                items: widget.addresses
+                items: _addresses
                     .map(
                       (address) => DropdownMenuItem(
                         value: address.id,
@@ -287,8 +338,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             SnackBar(
                               content: Text(
                                 paymentError == null
-                                    ? 'Order ${order.id} placed successfully'
-                                    : 'Order ${order.id} created. Payment pending: $paymentError',
+                                    ? 'Order number ${order.id} placed successfully'
+                                    : 'Order number ${order.id} created. Payment pending: $paymentError',
                               ),
                             ),
                           );

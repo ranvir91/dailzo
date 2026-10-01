@@ -33,7 +33,6 @@ class OrderLineItem {
 class PartnerOrder {
   PartnerOrder({
     required this.id,
-    required this.orderNumber,
     required this.status,
     required this.deliveryStatus,
     required this.paymentMethod,
@@ -49,7 +48,6 @@ class PartnerOrder {
   });
 
   final String id;
-  final int orderNumber;
   final String status;
   final String deliveryStatus;
   final String paymentMethod;
@@ -68,7 +66,9 @@ class PartnerOrder {
   /// on the plain orders list. Null everywhere else.
   final String? deliveryOtp;
 
-  String get displayNumber => orderNumber > 0 ? '#$orderNumber' : id;
+  /// The order's own id doubles as its human-facing order number — there's
+  /// no separate orderNumber field on the backend anymore.
+  String get displayNumber => '#$id';
 
   bool get canMarkOutForDelivery => deliveryStatus == 'ASSIGNED';
 
@@ -114,7 +114,6 @@ class PartnerOrder {
 
     return PartnerOrder(
       id: json['id']?.toString() ?? '',
-      orderNumber: int.tryParse(json['orderNumber']?.toString() ?? '0') ?? 0,
       status: json['status']?.toString() ?? 'PENDING',
       deliveryStatus: json['deliveryStatus']?.toString() ?? 'ASSIGNED',
       paymentMethod: json['paymentMethod']?.toString() ?? 'COD',
