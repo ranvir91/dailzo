@@ -3,14 +3,12 @@
 namespace App\Models;
 
 use App\Support\SerializesToCamelCase;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class ServicePincode extends Model
 {
     use HasFactory;
-    use HasUuids;
     use SerializesToCamelCase;
 
     protected $fillable = [

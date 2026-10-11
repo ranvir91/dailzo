@@ -2,6 +2,7 @@
 
 namespace App\Filament\Octa\Widgets;
 
+use App\Filament\Octa\Resources\OrderResource;
 use App\Models\Order;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -17,13 +18,16 @@ class RecentOrders extends BaseWidget
     {
         return $table
             ->heading('Recent orders')
+            ->recordUrl(fn (Order $record) => OrderResource::getUrl('view', ['record' => $record]))
             ->query(
                 Order::query()
-                    ->where('vendor_id', auth()->user()->vendorProfile?->id ?? '00000000-0000-0000-0000-000000000000')
+                    // 0 never matches a real id — safe "nothing" fallback
+                    // now that ids are auto-increment ints, not UUIDs.
+                    ->where('vendor_id', auth()->user()->vendorProfile?->id ?? 0)
                     ->latest(),
             )
             ->columns([
-                Tables\Columns\TextColumn::make('order_number')->label('Order #'),
+                Tables\Columns\TextColumn::make('id')->label('Order #'),
                 Tables\Columns\TextColumn::make('user.name')->label('Customer'),
                 Tables\Columns\TextColumn::make('activeAssignment.deliveryPartner.name')->label('Delivery partner')->placeholder('Unassigned'),
                 Tables\Columns\TextColumn::make('status')->badge()

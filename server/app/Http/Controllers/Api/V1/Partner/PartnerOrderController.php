@@ -165,7 +165,7 @@ class PartnerOrderController extends Controller
     public function reassign(Request $request, string $orderId): JsonResponse
     {
         $data = $request->validate([
-            'target_partner_id' => ['required', 'string', 'exists:delivery_partners,id'],
+            'target_partner_id' => ['required', 'integer', 'exists:delivery_partners,id'],
             'reason' => ['required', 'string'],
         ]);
 

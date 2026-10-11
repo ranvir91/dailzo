@@ -3,12 +3,10 @@
 namespace App\Models;
 
 use App\Support\SerializesToCamelCase;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 
 class StoreSetting extends Model
 {
-    use HasUuids;
     use SerializesToCamelCase;
 
     /** Defaults used when the settings row does not exist yet. */
@@ -34,6 +32,14 @@ class StoreSetting extends Model
         'store_open_time',
         'store_close_time',
         'payment_methods',
+        'business_name',
+        'business_address',
+        'business_state',
+        'business_pincode',
+        'gstin',
+        'pan',
+        'fssai_license',
+        'cin',
     ];
 
     protected function casts(): array

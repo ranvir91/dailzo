@@ -2,6 +2,8 @@
 
 namespace App\Filament\Octa\Widgets;
 
+use App\Filament\Octa\Resources\DeliveryPartnerResource;
+use App\Filament\Octa\Resources\OrderResource;
 use App\Models\DeliveryAssignment;
 use App\Models\DeliveryPartner;
 use App\Models\Order;
@@ -32,30 +34,36 @@ class VendorOverview extends BaseWidget
         return [
             Stat::make('Total orders', (clone $vendorOrders)->count())
                 ->description('All orders routed to you')
-                ->color('gray'),
+                ->color('gray')
+                ->url(OrderResource::getUrl()),
 
             Stat::make("Today's orders", (clone $vendorOrders)->where('created_at', '>=', $todayStart)->count())
                 ->description('Received today')
-                ->color('info'),
+                ->color('info')
+                ->url(OrderResource::getUrl()),
 
             Stat::make('Pending pickup', (clone $vendorAssignments)->where('status', DeliveryAssignment::STATUS_ASSIGNED)->count())
                 ->description('Assigned to a partner, not yet out')
-                ->color('warning'),
+                ->color('warning')
+                ->url(OrderResource::getUrl()),
 
             Stat::make('Out for delivery', (clone $vendorAssignments)->where('status', DeliveryAssignment::STATUS_OUT_FOR_DELIVERY)->count())
                 ->description('On the way right now')
-                ->color('warning'),
+                ->color('warning')
+                ->url(OrderResource::getUrl()),
 
             Stat::make('Completed today', (clone $vendorAssignments)
                 ->where('status', DeliveryAssignment::STATUS_DELIVERED)
                 ->where('status_changed_at', '>=', $todayStart)
                 ->count())
                 ->description('Delivered since midnight')
-                ->color('success'),
+                ->color('success')
+                ->url(OrderResource::getUrl()),
 
             Stat::make('Active delivery partners', DeliveryPartner::where('vendor_id', $vendor->id)->where('is_active', true)->count())
                 ->description('Available to receive orders')
-                ->color('primary'),
+                ->color('primary')
+                ->url(DeliveryPartnerResource::getUrl()),
         ];
     }
 }

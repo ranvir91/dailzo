@@ -9,28 +9,28 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('carts', function (Blueprint $table) {
-            $table->uuid('id')->primary();
-            $table->foreignUuid('user_id')->unique()->constrained()->cascadeOnDelete();
+            $table->id();
+            $table->foreignId('user_id')->unique()->constrained()->cascadeOnDelete();
             $table->timestamps();
         });
 
         Schema::create('cart_items', function (Blueprint $table) {
-            $table->uuid('id')->primary();
-            $table->foreignUuid('cart_id')->constrained()->cascadeOnDelete();
-            $table->foreignUuid('product_id')->constrained()->cascadeOnDelete();
+            $table->id();
+            $table->foreignId('cart_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('product_id')->constrained()->cascadeOnDelete();
             $table->integer('quantity');
             $table->timestamps();
         });
 
         Schema::create('orders', function (Blueprint $table) {
-            $table->uuid('id')->primary();
+            $table->id();
             // Was Order.orderNumber autoincrement; assigned in the model creating hook.
             $table->unsignedInteger('order_number')->nullable()->unique();
-            $table->foreignUuid('user_id')->constrained()->restrictOnDelete();
+            $table->foreignId('user_id')->constrained()->restrictOnDelete();
             $table->string('status')->default('PENDING');
             $table->string('payment_method');
             $table->decimal('total', 10, 2);
-            $table->uuid('address_id')->nullable();
+            $table->foreignId('address_id')->nullable();
             $table->timestamps();
 
             $table->index('user_id');
@@ -39,17 +39,17 @@ return new class extends Migration
         });
 
         Schema::create('order_items', function (Blueprint $table) {
-            $table->uuid('id')->primary();
-            $table->foreignUuid('order_id')->constrained()->cascadeOnDelete();
-            $table->foreignUuid('product_id')->constrained()->restrictOnDelete();
+            $table->id();
+            $table->foreignId('order_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('product_id')->constrained()->restrictOnDelete();
             $table->integer('quantity');
             $table->decimal('price', 10, 2);
             $table->timestamps();
         });
 
         Schema::create('payments', function (Blueprint $table) {
-            $table->uuid('id')->primary();
-            $table->foreignUuid('order_id')->constrained()->cascadeOnDelete();
+            $table->id();
+            $table->foreignId('order_id')->constrained()->cascadeOnDelete();
             $table->string('provider');
             $table->string('provider_payment_id')->nullable();
             $table->string('status')->default('PENDING');

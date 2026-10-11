@@ -64,7 +64,7 @@ class VendorResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('vendor_number')->label('#')->sortable(),
+                Tables\Columns\TextColumn::make('id')->label('#')->sortable(),
                 Tables\Columns\TextColumn::make('business_name')->searchable()->sortable(),
                 Tables\Columns\TextColumn::make('user.phone')->label('Login phone')->searchable(),
                 Tables\Columns\TextColumn::make('servicePincodes_count')->counts('servicePincodes')->label('Pincodes'),
@@ -72,7 +72,7 @@ class VendorResource extends Resource
                 Tables\Columns\ToggleColumn::make('is_active'),
                 Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable()->toggleable(),
             ])
-            ->defaultSort('vendor_number', 'desc')
+            ->defaultSort('id', 'desc')
             ->filters([
                 Tables\Filters\TernaryFilter::make('is_active'),
                 Tables\Filters\TrashedFilter::make(),

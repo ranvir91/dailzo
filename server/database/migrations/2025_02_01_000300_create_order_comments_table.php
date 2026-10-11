@@ -11,9 +11,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('order_comments', function (Blueprint $table) {
-            $table->uuid('id')->primary();
-            $table->foreignUuid('order_id')->constrained()->cascadeOnDelete();
-            $table->foreignUuid('delivery_partner_id')->nullable()->constrained()->nullOnDelete();
+            $table->id();
+            $table->foreignId('order_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('delivery_partner_id')->nullable()->constrained()->nullOnDelete();
             $table->string('type')->default('INCIDENT'); // INCIDENT | STATUS_CHANGE | REASSIGNMENT
             $table->text('body');
             $table->timestamps();

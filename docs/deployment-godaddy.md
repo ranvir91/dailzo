@@ -84,9 +84,18 @@ serves `public_html`. To use `yourdomain.com`:
 
 ## Step 5 — Upload the app
 
-Use the prepared archive **`dailzo-deploy.zip`** (it already contains `vendor/`,
-the built admin-panel assets, and the 26 product images; it does **not** contain
-`.env`).
+Build the archive with `server/bin/build-deploy-zip.sh` (needs `rsync`, `zip`
+and `composer` locally — not on the server). It produces
+**`dailzo-deploy.zip`** at the repo root: app code + a `vendor/` built with
+`composer install --no-dev` (so the server itself never needs composer). It
+deliberately does **not** contain `.env` or the contents of
+`public/uploads/` (only `uploads/.htaccess`, the CORS fix) — re-extracting
+must never overwrite your real `.env` or the product images already live on
+the server.
+
+```bash
+cd server && bin/build-deploy-zip.sh
+```
 
 1. cPanel → File Manager → open `public_html/`.
 2. **Upload** `dailzo-deploy.zip`.
@@ -182,6 +191,9 @@ Set its API base URL to `https://api.yourdomain.com/api/v1`.
 
 ## Redeploying later
 
-Re-upload `dailzo-deploy.zip` and re-extract over `dailzoapi/` (keep your `.env`),
-then re-run the Step 7 cache/migrate commands. Or, with SSH:
-`cd ~/public_html/dailzoapi && bash bin/deploy.sh`.
+1. Rebuild the zip: `cd server && bin/build-deploy-zip.sh`.
+2. Re-upload `dailzo-deploy.zip` and re-extract over `dailzoapi/` — extracting
+   merges into the existing folder rather than wiping it first, so your live
+   `.env` and `public/uploads/*` (real product images) are untouched.
+3. Re-run the Step 7 cache/migrate commands. Or, with SSH:
+   `cd ~/public_html/dailzoapi && bash bin/deploy.sh`.

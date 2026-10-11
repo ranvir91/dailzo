@@ -18,7 +18,7 @@ class CartController extends Controller
     public function addItem(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'productId' => ['required', 'string', 'exists:products,id'],
+            'productId' => ['required', 'integer', 'exists:products,id'],
             'quantity' => ['required', 'integer', 'min:1'],
         ]);
 

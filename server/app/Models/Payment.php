@@ -3,12 +3,10 @@
 namespace App\Models;
 
 use App\Support\SerializesToCamelCase;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 
 class Payment extends Model
 {
-    use HasUuids;
     use SerializesToCamelCase;
 
     protected $fillable = [

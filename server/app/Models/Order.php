@@ -2,17 +2,13 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\AssignsSequentialNumber;
 use App\Support\SerializesToCamelCase;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Order extends Model
 {
-    use AssignsSequentialNumber;
     use HasFactory;
-    use HasUuids;
     use SerializesToCamelCase;
 
     /**
@@ -49,11 +45,6 @@ class Order extends Model
             'delivery_charges' => 'decimal:2',
             'discount_amount' => 'decimal:2',
         ];
-    }
-
-    public function sequentialNumberColumn(): string
-    {
-        return 'order_number';
     }
 
     public function canTransitionTo(string $status): bool

@@ -14,13 +14,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('orders', function (Blueprint $table) {
-            $table->foreignUuid('coupon_id')->nullable()->after('total')
+            $table->foreignId('coupon_id')->nullable()->after('total')
                 ->constrained()->nullOnDelete();
             $table->decimal('discount_amount', 10, 2)->default(0)->after('coupon_id');
         });
 
         Schema::table('coupon_usages', function (Blueprint $table) {
-            $table->foreignUuid('order_id')->nullable()->after('user_id')
+            $table->foreignId('order_id')->nullable()->after('user_id')
                 ->constrained()->nullOnDelete();
         });
     }

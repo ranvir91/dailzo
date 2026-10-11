@@ -4,7 +4,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Str;
 
 return new class extends Migration
 {
@@ -17,8 +16,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('delivery_partners', function (Blueprint $table) {
-            $table->uuid('user_id')->nullable()->after('id');
-            $table->uuid('vendor_id')->nullable()->after('user_id');
+            $table->unsignedBigInteger('user_id')->nullable()->after('id');
+            $table->unsignedBigInteger('vendor_id')->nullable()->after('user_id');
         });
 
         // Backfill: give every existing delivery partner a paired users row.
@@ -28,10 +27,7 @@ return new class extends Migration
         // password keeps working unchanged.
         $now = now();
         DB::table('delivery_partners')->orderBy('id')->get()->each(function ($partner) use ($now) {
-            $userId = (string) Str::uuid();
-
-            DB::table('users')->insert([
-                'id' => $userId,
+            $userId = DB::table('users')->insertGetId([
                 'name' => $partner->name,
                 'phone' => $partner->phone,
                 'role' => 'DELIVERY_PARTNER',
@@ -44,7 +40,7 @@ return new class extends Migration
         });
 
         Schema::table('delivery_partners', function (Blueprint $table) {
-            $table->uuid('user_id')->nullable(false)->change();
+            $table->unsignedBigInteger('user_id')->nullable(false)->change();
             $table->unique('user_id');
             $table->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
             $table->foreign('vendor_id')->references('id')->on('vendors')->nullOnDelete();

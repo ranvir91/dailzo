@@ -42,7 +42,7 @@ class OrderResource extends Resource
     {
         return $infolist->schema([
             Infolists\Components\Section::make()->schema([
-                Infolists\Components\TextEntry::make('order_number')->label('Order #'),
+                Infolists\Components\TextEntry::make('id')->label('Order #'),
                 Infolists\Components\TextEntry::make('user.name')->label('Customer'),
                 Infolists\Components\TextEntry::make('user.phone')->label('Phone'),
                 Infolists\Components\TextEntry::make('user.email')->label('Email')->placeholder('—'),
@@ -119,7 +119,7 @@ class OrderResource extends Resource
                     ->stacked()
                     ->limit(3)
                     ->circular(),
-                Tables\Columns\TextColumn::make('order_number')->label('Order #')->searchable()->sortable(),
+                Tables\Columns\TextColumn::make('id')->label('Order #')->searchable()->sortable(),
                 Tables\Columns\TextColumn::make('user.name')->label('Customer')->searchable(),
                 Tables\Columns\TextColumn::make('activeAssignment.deliveryPartner.name')->label('Delivery partner')->placeholder('Unassigned'),
                 Tables\Columns\TextColumn::make('status')->badge()->sortable()

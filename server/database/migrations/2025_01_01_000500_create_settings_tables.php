@@ -10,7 +10,7 @@ return new class extends Migration
     {
         // Single-row table (was StoreSetting). The API always reads/updates the first row.
         Schema::create('store_settings', function (Blueprint $table) {
-            $table->uuid('id')->primary();
+            $table->id();
             $table->decimal('delivery_charges', 10, 2);
             $table->decimal('tax', 10, 2);
             $table->decimal('min_order_value', 10, 2)->default(0);
@@ -24,7 +24,7 @@ return new class extends Migration
         });
 
         Schema::create('service_pincodes', function (Blueprint $table) {
-            $table->uuid('id')->primary();
+            $table->id();
             $table->string('pincode')->unique();
             $table->boolean('is_active')->default(true);
             $table->timestamps();

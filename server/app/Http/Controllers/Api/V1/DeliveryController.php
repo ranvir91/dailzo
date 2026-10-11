@@ -26,8 +26,8 @@ class DeliveryController extends Controller
     public function assign(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'orderId' => ['required', 'string', 'exists:orders,id'],
-            'deliveryPartnerId' => ['required', 'string', 'exists:delivery_partners,id'],
+            'orderId' => ['required', 'integer', 'exists:orders,id'],
+            'deliveryPartnerId' => ['required', 'integer', 'exists:delivery_partners,id'],
         ]);
 
         $order = Order::findOrFail($data['orderId']);

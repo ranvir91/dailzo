@@ -13,7 +13,7 @@ class OrderApiTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_a_customer_can_place_an_order_and_gets_an_order_number(): void
+    public function test_a_customer_can_place_an_order_and_the_order_is_identified_by_its_id(): void
     {
         $customer = User::factory()->create();
         $product = Product::factory()->create(['price' => 100, 'discounted_price' => 80]);
@@ -24,7 +24,10 @@ class OrderApiTest extends TestCase
             'items' => [['productId' => $product->id, 'quantity' => 2]],
         ])->assertOk()->assertJsonPath('message', 'Order created successfully');
 
-        $this->assertSame(100001, $response->json('data.orderNumber'));
+        // No separate order_number column anymore — the primary key id is
+        // the order number everywhere (API, Atlas, Octa, both Flutter apps).
+        $this->assertIsInt($response->json('data.id'));
+        $this->assertArrayNotHasKey('orderNumber', $response->json('data'));
         $this->assertSame('80.00', $response->json('data.items.0.price'));
     }
 

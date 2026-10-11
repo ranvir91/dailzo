@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Support\SerializesToCamelCase;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -11,7 +10,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Category extends Model
 {
     use HasFactory;
-    use HasUuids;
     use SerializesToCamelCase;
     use SoftDeletes;
 
@@ -20,6 +18,7 @@ class Category extends Model
         'slug',
         'description',
         'icon_url',
+        'tax_rate',
         'is_active',
         'sort_order',
     ];
@@ -27,6 +26,7 @@ class Category extends Model
     protected function casts(): array
     {
         return [
+            'tax_rate' => 'decimal:2',
             'is_active' => 'boolean',
             'sort_order' => 'integer',
         ];

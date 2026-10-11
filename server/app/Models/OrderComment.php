@@ -3,12 +3,10 @@
 namespace App\Models;
 
 use App\Support\SerializesToCamelCase;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 
 class OrderComment extends Model
 {
-    use HasUuids;
     use SerializesToCamelCase;
 
     public const TYPE_INCIDENT = 'INCIDENT';

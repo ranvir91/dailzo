@@ -2,10 +2,8 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\AssignsSequentialNumber;
 use App\Support\SerializesToCamelCase;
 use Database\Factories\VendorFactory;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -20,10 +18,8 @@ use Illuminate\Support\Facades\DB;
 class Vendor extends Model
 {
     /** @use HasFactory<VendorFactory> */
-    use AssignsSequentialNumber;
-
     use HasFactory;
-    use HasUuids;
+
     use SerializesToCamelCase;
     use SoftDeletes;
 
@@ -38,11 +34,6 @@ class Vendor extends Model
         return [
             'is_active' => 'boolean',
         ];
-    }
-
-    public function sequentialNumberColumn(): string
-    {
-        return 'vendor_number';
     }
 
     public function user()

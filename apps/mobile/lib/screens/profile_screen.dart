@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../models/address.dart';
 import '../models/user_profile.dart';
 
+enum ProfileSection { profile, addresses }
+
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({
     super.key,
@@ -14,6 +16,7 @@ class ProfileScreen extends StatefulWidget {
     required this.onUpdateAddress,
     required this.onDeleteAddress,
     required this.onLogout,
+    this.initialSection = ProfileSection.profile,
   });
 
   final UserProfile? profile;
@@ -41,6 +44,7 @@ class ProfileScreen extends StatefulWidget {
   }) onUpdateAddress;
   final Future<void> Function(String id) onDeleteAddress;
   final Future<void> Function() onLogout;
+  final ProfileSection initialSection;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -53,6 +57,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _gender = 'MALE';
   bool _saving = false;
   late List<Address> _addresses;
+  final _addressesSectionKey = GlobalKey();
 
   @override
   void initState() {
@@ -63,6 +68,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _emailController = TextEditingController(text: profile?.email ?? '');
     _gender = (profile?.gender.isNotEmpty == true ? profile!.gender : 'MALE').toUpperCase();
     _addresses = List<Address>.from(widget.addresses);
+
+    if (widget.initialSection == ProfileSection.addresses) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final sectionContext = _addressesSectionKey.currentContext;
+        if (sectionContext != null) {
+          Scrollable.ensureVisible(sectionContext, duration: const Duration(milliseconds: 300));
+        }
+      });
+    }
   }
 
   @override
@@ -85,7 +99,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated successfully')));
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Update failed: $error')));
+      // Show the server's message as-is (e.g. "User not found") — no
+      // "Update failed:"/"Exception:" framing in front of it.
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$error')));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -324,6 +340,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 10),
             Card(
+              key: _addressesSectionKey,
               child: Padding(
                 padding: const EdgeInsets.all(14),
                 child: Column(

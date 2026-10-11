@@ -7,21 +7,26 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\StoreSetting;
 use App\Services\CouponService;
+use App\Services\InvoiceService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
     private const WITH = ['items.product', 'coupon'];
 
-    public function __construct(private readonly CouponService $coupons) {}
+    public function __construct(
+        private readonly CouponService $coupons,
+        private readonly InvoiceService $invoices,
+    ) {}
 
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'addressId' => ['sometimes', 'nullable', 'string'],
+            'addressId' => ['sometimes', 'nullable', 'integer'],
             'paymentMethod' => ['required', 'string'],
             // Kept for backward compatibility with older app builds; no
             // longer trusted for the order total (see below) — a client
@@ -29,17 +34,26 @@ class OrderController extends Controller
             'total' => ['required', 'numeric'],
             'couponCode' => ['sometimes', 'nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.productId' => ['required', 'string'],
+            'items.*.productId' => ['required', 'integer'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
         ]);
 
         $settings = StoreSetting::current();
 
-        $prices = Product::whereIn('id', collect($data['items'])->pluck('productId'))
+        $products = Product::with('category')
+            ->whereIn('id', collect($data['items'])->pluck('productId'))
             ->get()
-            ->mapWithKeys(fn (Product $p) => [
-                $p->id => (float) ($p->discounted_price ?? $p->price),
-            ]);
+            ->keyBy('id');
+
+        $prices = $products->map(fn (Product $p) => (float) ($p->discounted_price ?? $p->price));
+
+        // Snapshotted onto each order_item below so a category's tax_rate
+        // changing later never rewrites an already-placed order's invoice.
+        $taxRates = $products->map(fn (Product $p) => (float) ($p->category?->tax_rate ?? 0));
+
+        // Also snapshotted — the invoice's MRP/discount columns must stay
+        // frozen even if a product's mrp changes after the order is placed.
+        $mrps = $products->map(fn (Product $p) => (float) ($p->mrp ?? 0));
 
         $subtotal = collect($data['items'])
             ->sum(fn (array $item) => ($prices[$item['productId']] ?? 0) * $item['quantity']);
@@ -48,7 +62,7 @@ class OrderController extends Controller
             abort(400, "Minimum order value is ₹{$settings->min_order_value}. Please add more items to your cart.");
         }
 
-        $order = DB::transaction(function () use ($request, $data, $prices, $subtotal, $settings) {
+        $order = DB::transaction(function () use ($request, $data, $prices, $taxRates, $mrps, $subtotal, $settings) {
             ['coupon' => $coupon, 'discount' => $discount] = $this->coupons->resolveForCheckout(
                 $data['couponCode'] ?? null,
                 $request->user(),
@@ -72,6 +86,8 @@ class OrderController extends Controller
                     'product_id' => $item['productId'],
                     'quantity' => $item['quantity'],
                     'price' => $prices[$item['productId']] ?? 0,
+                    'tax_rate' => $taxRates[$item['productId']] ?? 0,
+                    'mrp' => $mrps[$item['productId']] ?? 0,
                 ]);
             }
 
@@ -141,6 +157,18 @@ class OrderController extends Controller
         $order->update(['status' => $data['status']]);
 
         return ApiResponse::success($order->load(self::WITH), 'Order status updated successfully');
+    }
+
+    public function invoice(Request $request, string $id): JsonResponse|Response
+    {
+        $order = $this->find($request, $id);
+        if (! $order) {
+            return ApiResponse::success(null, 'Order not found');
+        }
+
+        $pdf = $this->invoices->render($order);
+
+        return $pdf->stream("invoice-{$this->invoices->invoiceNumber($order)}.pdf");
     }
 
     private function find(Request $request, string $id): ?Order

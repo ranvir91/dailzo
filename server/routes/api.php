@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\CouponController;
 use App\Http\Controllers\Api\V1\DeliveryController;
 use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\NotificationController;
+use App\Http\Controllers\Api\V1\OfferController;
 use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\Partner\PartnerAuthController;
 use App\Http\Controllers\Api\V1\Partner\PartnerOrderController;
@@ -47,6 +48,8 @@ Route::get('products/{id}', [ProductController::class, 'show']);
 
 Route::get('categories', [CategoryController::class, 'index']);
 
+Route::get('offers', [OfferController::class, 'index']);
+
 Route::get('coupons/admin', [CouponController::class, 'adminIndex'])->middleware(['auth:sanctum', 'admin']);
 Route::get('coupons', [CouponController::class, 'index']);
 Route::get('coupons/{code}', [CouponController::class, 'show']);
@@ -79,6 +82,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('orders', [OrderController::class, 'store']);
     Route::get('orders', [OrderController::class, 'index']);
     Route::get('orders/{id}', [OrderController::class, 'show']);
+    Route::get('orders/{id}/invoice', [OrderController::class, 'invoice']);
     Route::post('orders/{id}/cancel', [OrderController::class, 'cancel']);
 });
 
