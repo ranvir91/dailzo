@@ -56,6 +56,25 @@ class AtlasProductResourceTest extends TestCase
         $this->assertSame('900.00', (string) $product->purchase_price);
     }
 
+    public function test_creating_a_product_saves_its_tags(): void
+    {
+        $category = Category::factory()->create();
+
+        Livewire::test(CreateProduct::class)
+            ->fillForm([
+                'name' => 'Combo Pack',
+                'category_id' => $category->id,
+                'price' => 199,
+                'stock' => 5,
+                'tags' => ['BOGO', 'Combo'],
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $product = Product::where('name', 'Combo Pack')->firstOrFail();
+        $this->assertSame(['BOGO', 'Combo'], $product->tags);
+    }
+
     public function test_editing_a_product_updates_the_new_billing_fields(): void
     {
         $category = Category::factory()->create();

@@ -43,6 +43,7 @@ class Product extends Model
         'discounted_price',
         'purchase_price',
         'part_no',
+        'tags',
         'stock',
         'reserved',
         'images',
@@ -63,6 +64,7 @@ class Product extends Model
     {
         return [
             'images' => 'array',
+            'tags' => 'array',
             'price' => 'decimal:2',
             'mrp' => 'decimal:2',
             'discounted_price' => 'decimal:2',

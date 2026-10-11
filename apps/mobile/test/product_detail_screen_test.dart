@@ -5,7 +5,7 @@ import 'package:dailzo_mobile/models/product.dart';
 import 'package:dailzo_mobile/screens/product_detail_screen.dart';
 
 void main() {
-  testWidgets('shows the tax-inclusive price breakdown and new product fields',
+  testWidgets('shows the new product fields but not a price breakdown',
       (tester) async {
     final product = Product(
       id: '1',
@@ -42,13 +42,9 @@ void main() {
     expect(find.text('Brand: Acme'), findsOneWidget);
     expect(find.text('HSN/SAC: 8504'), findsOneWidget);
     expect(find.text('PCS'), findsOneWidget);
-
-    await tester.scrollUntilVisible(find.text('Price breakdown'), 300);
-    expect(find.text('Price breakdown'), findsOneWidget);
-    expect(find.text('Base price'), findsOneWidget);
-    expect(find.text('₹1016.95'), findsOneWidget);
-    expect(find.text('Tax (18%)'), findsOneWidget);
-    expect(find.text('₹183.05'), findsOneWidget);
     expect(find.textContaining('MRP ₹1500.00'), findsOneWidget);
+
+    expect(find.text('Price breakdown'), findsNothing);
+    expect(find.text('Base price'), findsNothing);
   });
 }
