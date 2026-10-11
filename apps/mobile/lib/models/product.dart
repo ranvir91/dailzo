@@ -14,6 +14,13 @@ class Product {
     required this.category,
     required this.imageUrls,
     this.sortOrder = 0,
+    this.brand = '',
+    this.unit = '',
+    this.hsnSacCode = '',
+    this.mrp = 0,
+    this.taxRate = 0,
+    this.basePrice = 0,
+    this.taxAmount = 0,
   });
 
   final String id;
@@ -28,6 +35,17 @@ class Product {
   final String category;
   final List<String> imageUrls;
   final int sortOrder;
+  final String brand;
+  final String unit;
+  final String hsnSacCode;
+  final double mrp;
+
+  /// Pre-split from the tax-inclusive selling price by the backend (see
+  /// Product::getBasePriceAttribute) using the category's current tax_rate —
+  /// never recomputed here, so it always matches the invoice.
+  final double taxRate;
+  final double basePrice;
+  final double taxAmount;
 
   String get primaryImageUrl => imageUrls.isEmpty ? '' : imageUrls.first;
   double get currentPrice => discountedPrice > 0 ? discountedPrice : price;
@@ -100,6 +118,13 @@ class Product {
           : (json['category']?.toString() ?? 'Groceries'),
       imageUrls: uniqueImageUrls,
       sortOrder: int.tryParse(json['sortOrder']?.toString() ?? '0') ?? 0,
+      brand: json['brand']?.toString() ?? '',
+      unit: json['unit']?.toString() ?? '',
+      hsnSacCode: json['hsnSacCode']?.toString() ?? '',
+      mrp: _parsePrice(json['mrp']),
+      taxRate: _parsePrice(json['taxRate']),
+      basePrice: _parsePrice(json['basePrice']),
+      taxAmount: _parsePrice(json['taxAmount']),
     );
   }
 }

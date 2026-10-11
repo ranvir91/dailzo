@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/order.dart';
 import '../services/api_service.dart';
+import '../utils/invoice_downloader.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   const OrderDetailScreen({super.key, required this.orderId});
@@ -14,11 +15,27 @@ class OrderDetailScreen extends StatefulWidget {
 
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
   late Future<Order> _future;
+  bool _downloadingInvoice = false;
 
   @override
   void initState() {
     super.initState();
     _future = ApiService.instance.fetchOrderById(widget.orderId);
+  }
+
+  Future<void> _downloadInvoice() async {
+    setState(() => _downloadingInvoice = true);
+    try {
+      final bytes = await ApiService.instance.downloadInvoice(widget.orderId);
+      final error = await openInvoiceBytes(bytes, 'invoice-${widget.orderId}.pdf');
+      if (!mounted || error == null) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$error')));
+    } finally {
+      if (mounted) setState(() => _downloadingInvoice = false);
+    }
   }
 
   List<Widget> _buildProgressSteps(Order order) {
@@ -207,6 +224,21 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           Text('₹${order.total.toStringAsFixed(0)}',
               style:
                   const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _downloadingInvoice ? null : _downloadInvoice,
+              icon: _downloadingInvoice
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.download_outlined),
+              label: Text(
+                  _downloadingInvoice ? 'Preparing invoice...' : 'Download invoice'),
+            ),
+          ),
         ],
       ),
     );

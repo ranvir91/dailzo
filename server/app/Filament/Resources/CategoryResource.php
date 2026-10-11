@@ -37,6 +37,9 @@ class CategoryResource extends Resource
             Forms\Components\Textarea::make('description')->rows(2)->columnSpanFull(),
             Forms\Components\FileUpload::make('icon_url')
                 ->image()->disk('web')->directory('uploads')->visibility('public'),
+            Forms\Components\TextInput::make('tax_rate')->numeric()->step(0.01)->suffix('%')
+                ->default(0)->minValue(0)->maxValue(100)
+                ->helperText('GST applied to every product in this category, e.g. Food 0%, Clothes 5%, Electronics 18%, or a decimal rate like 12.5%. Product prices are entered tax-inclusive — this only splits them into base + tax for display and invoices.'),
             Forms\Components\TextInput::make('sort_order')->numeric()->integer()->default(0)
                 ->helperText('Lower numbers show first.'),
             Forms\Components\Toggle::make('is_active')->default(true),
@@ -50,6 +53,7 @@ class CategoryResource extends Resource
                 Tables\Columns\ImageColumn::make('icon_url')->disk('web')->label('')->circular(),
                 Tables\Columns\TextColumn::make('name')->searchable()->sortable(),
                 Tables\Columns\TextColumn::make('slug')->color('gray')->toggleable(),
+                Tables\Columns\TextColumn::make('tax_rate')->label('Tax')->suffix('%')->sortable(),
                 Tables\Columns\TextColumn::make('products_count')->counts('products')->label('Products')->badge(),
                 Tables\Columns\TextColumn::make('sort_order')->numeric()->sortable(),
                 Tables\Columns\ToggleColumn::make('is_active'),

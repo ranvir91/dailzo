@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -348,6 +349,39 @@ class ApiService {
       throw ApiException('Order details unavailable for $id.');
     }
     return Order.fromJson(data);
+  }
+
+  /// Returns the raw PDF bytes for an order's invoice. Unlike `_request`,
+  /// a successful response here is `application/pdf`, not JSON — only the
+  /// failure path (e.g. "Order not found") comes back as the usual JSON
+  /// envelope, so it's parsed just to extract a user-presentable message.
+  Future<Uint8List> downloadInvoice(String orderId) async {
+    if (!isAuthenticated) {
+      throw ApiException('Please login first.');
+    }
+
+    final uri = Uri.parse('${AppEnv.baseUrl}/orders/$orderId/invoice');
+    final response = await _client.get(uri, headers: {
+      'Authorization': 'Bearer ${_session!.accessToken}',
+    });
+
+    final contentType = response.headers['content-type'] ?? '';
+    if (response.statusCode >= 200 &&
+        response.statusCode < 300 &&
+        contentType.contains('application/pdf')) {
+      return response.bodyBytes;
+    }
+
+    try {
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        throw ApiException(
+            decoded['message']?.toString() ?? 'Unable to download invoice.');
+      }
+    } on FormatException {
+      // Fall through to the generic message below.
+    }
+    throw ApiException('Unable to download invoice.');
   }
 
   Future<List<Coupon>> fetchCoupons() async {

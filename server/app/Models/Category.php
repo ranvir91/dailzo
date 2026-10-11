@@ -18,6 +18,7 @@ class Category extends Model
         'slug',
         'description',
         'icon_url',
+        'tax_rate',
         'is_active',
         'sort_order',
     ];
@@ -25,6 +26,7 @@ class Category extends Model
     protected function casts(): array
     {
         return [
+            'tax_rate' => 'decimal:2',
             'is_active' => 'boolean',
             'sort_order' => 'integer',
         ];

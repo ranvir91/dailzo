@@ -479,9 +479,58 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   Padding(
                     padding: const EdgeInsets.all(4),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(20),
-                      onTap: _openProfile,
+                    child: PopupMenuButton<String>(
+                      tooltip: 'Account',
+                      onSelected: (value) {
+                        switch (value) {
+                          case 'profile':
+                            _openProfile(section: ProfileSection.profile);
+                            break;
+                          case 'addresses':
+                            _openProfile(section: ProfileSection.addresses);
+                            break;
+                          case 'orders':
+                            _selectTab(3);
+                            break;
+                          case 'logout':
+                            _handleLogoutMenuTap();
+                            break;
+                        }
+                      },
+                      itemBuilder: (context) => const [
+                        PopupMenuItem(
+                          value: 'profile',
+                          child: ListTile(
+                            leading: Icon(Icons.person_outline),
+                            title: Text('Update profile'),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'addresses',
+                          child: ListTile(
+                            leading: Icon(Icons.location_on_outlined),
+                            title: Text('My addresses'),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'orders',
+                          child: ListTile(
+                            leading: Icon(Icons.receipt_long_outlined),
+                            title: Text('My orders'),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'logout',
+                          child: ListTile(
+                            leading: Icon(Icons.logout),
+                            title: Text('Logout'),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                      ],
                       child: const CircleAvatar(
                           radius: 13, child: Icon(Icons.person, size: 16)),
                     ),
@@ -873,7 +922,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Cart (2) and Buy Again (3) need an account; Home (0) and Categories (1)
+  /// Cart (2) and My Orders (3) need an account; Home (0) and Categories (1)
   /// are open to guests.
   Future<void> _selectTab(int index) async {
     if (index == 2 || index == 3) {
@@ -909,7 +958,7 @@ class _HomeScreenState extends State<HomeScreen> {
           NavigationDestination(
               icon: Icon(Icons.shopping_cart_outlined), label: 'Cart'),
           NavigationDestination(
-              icon: Icon(Icons.replay_outlined), label: 'Buy Again'),
+              icon: Icon(Icons.receipt_long_outlined), label: 'My Orders'),
         ],
       ),
     );
@@ -967,10 +1016,11 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Widget _buildProfileScreen() {
+  Widget _buildProfileScreen({ProfileSection section = ProfileSection.profile}) {
     return ProfileScreen(
       profile: _profile,
       addresses: _addresses,
+      initialSection: section,
       onReload: _loadData,
       onSaveProfile: ({
         required String name,
@@ -1030,13 +1080,20 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _openProfile() async {
+  Future<void> _openProfile({ProfileSection section = ProfileSection.profile}) async {
     final ok = await _ensureLoggedIn(message: 'Login to view your profile.');
     if (!ok || !mounted) return;
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => _buildProfileScreen()),
+      MaterialPageRoute(builder: (_) => _buildProfileScreen(section: section)),
     );
     if (!mounted) return;
+    await _loadData();
+  }
+
+  Future<void> _handleLogoutMenuTap() async {
+    await widget.onLogout();
+    if (!mounted) return;
+    setState(() => _selectedIndex = 0);
     await _loadData();
   }
 

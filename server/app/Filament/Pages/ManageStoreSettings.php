@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Models\StoreSetting;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\TagsInput;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
 use Filament\Forms\Components\Toggle;
@@ -42,6 +43,14 @@ class ManageStoreSettings extends Page implements HasForms
             'store_open_time' => $s->store_open_time,
             'store_close_time' => $s->store_close_time,
             'payment_methods' => $s->payment_methods,
+            'business_name' => $s->business_name,
+            'business_address' => $s->business_address,
+            'business_state' => $s->business_state,
+            'business_pincode' => $s->business_pincode,
+            'gstin' => $s->gstin,
+            'pan' => $s->pan,
+            'fssai_license' => $s->fssai_license,
+            'cin' => $s->cin,
         ]);
     }
 
@@ -65,6 +74,21 @@ class ManageStoreSettings extends Page implements HasForms
                         ->label('Maintenance mode')
                         ->helperText('When on, the mobile app shows a maintenance screen.'),
                 ])->columns(2),
+
+                Section::make('Invoice details')
+                    ->description('Printed on every order invoice as the seller block, and used to decide CGST+SGST vs IGST against the delivery address state.')
+                    ->schema([
+                        TextInput::make('business_name')->label('Legal business name')->maxLength(255),
+                        TextInput::make('gstin')->label('GSTIN')->maxLength(20),
+                        Textarea::make('business_address')->rows(2)->columnSpanFull(),
+                        TextInput::make('business_state')->label('State'),
+                        TextInput::make('business_pincode')->label('Pincode'),
+                        TextInput::make('pan')->label('PAN'),
+                        TextInput::make('fssai_license')->label('FSSAI license no.')
+                            ->helperText('Leave blank if not applicable.'),
+                        TextInput::make('cin')->label('CIN')
+                            ->helperText('Leave blank if not applicable.'),
+                    ])->columns(2),
             ])
             ->statePath('data');
     }

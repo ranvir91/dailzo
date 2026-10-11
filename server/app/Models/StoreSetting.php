@@ -32,6 +32,14 @@ class StoreSetting extends Model
         'store_open_time',
         'store_close_time',
         'payment_methods',
+        'business_name',
+        'business_address',
+        'business_state',
+        'business_pincode',
+        'gstin',
+        'pan',
+        'fssai_license',
+        'cin',
     ];
 
     protected function casts(): array

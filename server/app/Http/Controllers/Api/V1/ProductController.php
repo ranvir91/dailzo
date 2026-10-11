@@ -9,6 +9,7 @@ use App\Support\ApiResponse;
 use App\Support\UploadPath;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
 {
@@ -43,10 +44,19 @@ class ProductController extends Controller
 
         $product = Product::create([
             'name' => $data['name'],
+            'item_type' => $data['itemType'] ?? 'GOODS',
             'description' => $data['description'] ?? null,
+            'sku' => $data['sku'] ?? null,
+            'item_code' => $data['itemCode'] ?? null,
+            'hsn_sac_code' => $data['hsnSacCode'] ?? null,
+            'brand' => $data['brand'] ?? null,
+            'unit' => $data['unit'] ?? null,
             'category_id' => $category->id,
             'price' => $data['price'],
+            'mrp' => $data['mrp'] ?? null,
             'discounted_price' => $data['discountedPrice'] ?? null,
+            'purchase_price' => $data['purchasePrice'] ?? null,
+            'part_no' => $data['partNo'] ?? null,
             'stock' => $data['stock'],
             'images' => UploadPath::normalizeMany($data['images'] ?? []),
             'sort_order' => $data['sortOrder'] ?? 0,
@@ -62,11 +72,27 @@ class ProductController extends Controller
             return ApiResponse::success(null, 'Product not found');
         }
 
-        $data = $this->validated($request, creating: false);
+        $data = $this->validated($request, creating: false, ignoreId: $id);
 
         foreach (['name', 'description', 'price', 'stock'] as $field) {
             if (array_key_exists($field, $data)) {
                 $product->{$field} = $data[$field];
+            }
+        }
+        $passthrough = [
+            'itemType' => 'item_type',
+            'sku' => 'sku',
+            'itemCode' => 'item_code',
+            'hsnSacCode' => 'hsn_sac_code',
+            'brand' => 'brand',
+            'unit' => 'unit',
+            'mrp' => 'mrp',
+            'purchasePrice' => 'purchase_price',
+            'partNo' => 'part_no',
+        ];
+        foreach ($passthrough as $requestKey => $column) {
+            if (array_key_exists($requestKey, $data)) {
+                $product->{$column} = $data[$requestKey];
             }
         }
         if (array_key_exists('discountedPrice', $data)) {
@@ -106,15 +132,27 @@ class ProductController extends Controller
      * Admin forms send numbers as strings and an empty string for "clear this".
      * '' → null for discountedPrice (nullable), '' → 0/unchanged for sortOrder.
      */
-    private function validated(Request $request, bool $creating): array
+    private function validated(Request $request, bool $creating, ?string $ignoreId = null): array
     {
         $rules = [
             'name' => [$creating ? 'required' : 'sometimes', 'string'],
+            'itemType' => ['sometimes', 'nullable', 'string', 'in:GOODS,SERVICE'],
             'description' => ['sometimes', 'nullable', 'string'],
+            'sku' => [
+                'sometimes', 'nullable', 'string',
+                Rule::unique('products', 'sku')->ignore($ignoreId),
+            ],
+            'itemCode' => ['sometimes', 'nullable', 'string'],
+            'hsnSacCode' => ['sometimes', 'nullable', 'string'],
+            'brand' => ['sometimes', 'nullable', 'string'],
+            'unit' => ['sometimes', 'nullable', 'string'],
             'category' => ['sometimes', 'nullable', 'string'],
             'categoryId' => ['sometimes', 'nullable', 'integer'],
             'price' => [$creating ? 'required' : 'sometimes', 'numeric', 'min:0'],
+            'mrp' => ['sometimes', 'nullable'],
             'discountedPrice' => ['sometimes', 'nullable'],
+            'purchasePrice' => ['sometimes', 'nullable'],
+            'partNo' => ['sometimes', 'nullable', 'string'],
             'stock' => [$creating ? 'required' : 'sometimes', 'integer', 'min:0'],
             'images' => ['sometimes', 'array'],
             'images.*' => ['string'],
@@ -123,10 +161,12 @@ class ProductController extends Controller
 
         $data = $request->validate($rules);
 
-        if (array_key_exists('discountedPrice', $data)) {
-            $data['discountedPrice'] = ($data['discountedPrice'] === '' || $data['discountedPrice'] === null)
-                ? null
-                : (float) $data['discountedPrice'];
+        foreach (['discountedPrice', 'mrp', 'purchasePrice'] as $nullableNumber) {
+            if (array_key_exists($nullableNumber, $data)) {
+                $data[$nullableNumber] = ($data[$nullableNumber] === '' || $data[$nullableNumber] === null)
+                    ? null
+                    : (float) $data[$nullableNumber];
+            }
         }
         if (array_key_exists('sortOrder', $data)) {
             $data['sortOrder'] = ($data['sortOrder'] === '' || $data['sortOrder'] === null)
