@@ -19,6 +19,7 @@ import 'screens/order_detail_screen.dart';
 import 'screens/orders_screen.dart';
 import 'screens/product_detail_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/tagged_products_screen.dart';
 import 'services/api_service.dart';
 import 'widgets/product_tile.dart';
 
@@ -371,6 +372,24 @@ class _HomeScreenState extends State<HomeScreen> {
           onGoToCart: _goToCart,
           isServiceable: isServiceable,
           cartItemCount: _cartItemCount,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openOfferProducts(Offer offer) async {
+    if (offer.tag.isEmpty) return;
+    final isServiceable = ApiService.instance
+        .isPincodeServiceable(_selectedPincode, _serviceablePincodes);
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TaggedProductsScreen(
+          tag: offer.tag,
+          title: offer.title,
+          allProducts: _products,
+          onAddToCart: _addToCart,
+          onOpenProduct: _openProduct,
+          isServiceable: isServiceable,
         ),
       ),
     );
@@ -747,47 +766,53 @@ class _HomeScreenState extends State<HomeScreen> {
           final offer = _offers[index];
           return ClipRRect(
             borderRadius: BorderRadius.circular(14),
-            child: Container(
-              width: 260,
+            child: Material(
               color: Theme.of(context).colorScheme.primaryContainer,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (offer.imageUrl.isNotEmpty)
-                    Image.network(
-                      offer.imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                    ),
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      padding: const EdgeInsets.fromLTRB(12, 20, 12, 10),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.black.withValues(alpha: 0),
-                            Colors.black.withValues(alpha: 0.55),
-                          ],
+              child: InkWell(
+                onTap:
+                    offer.tag.isEmpty ? null : () => _openOfferProducts(offer),
+                child: SizedBox(
+                  width: 260,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      if (offer.imageUrl.isNotEmpty)
+                        Image.network(
+                          offer.imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                        ),
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          padding: const EdgeInsets.fromLTRB(12, 20, 12, 10),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.black.withValues(alpha: 0),
+                                Colors.black.withValues(alpha: 0.55),
+                              ],
+                            ),
+                          ),
+                          child: Text(
+                            offer.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                            ),
+                          ),
                         ),
                       ),
-                      child: Text(
-                        offer.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           );

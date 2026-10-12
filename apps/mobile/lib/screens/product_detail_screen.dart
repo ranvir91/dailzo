@@ -136,7 +136,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           const SizedBox(height: 10),
           Text(widget.product.description.isNotEmpty
               ? widget.product.description
-              : 'Fresh essentials delivered fast.'),
+              : 'Everyday essentials, delivered on demand.'),
           const SizedBox(height: 10),
           Card(
             child: Padding(
@@ -151,39 +151,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   if (widget.product.hsnSacCode.isNotEmpty)
                     Text('HSN/SAC: ${widget.product.hsnSacCode}'),
                   Text('Category: ${widget.product.category}'),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Price breakdown',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleSmall
-                        ?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 6),
-                  _priceBreakdownRow(
-                      'Base price', widget.product.basePrice),
-                  _priceBreakdownRow(
-                    widget.product.taxRate > 0
-                        ? 'Tax (${widget.product.taxRate.toStringAsFixed(0)}%)'
-                        : 'Tax',
-                    widget.product.taxAmount,
-                  ),
-                  const Divider(height: 14),
-                  _priceBreakdownRow(
-                    'Total (incl. of tax)',
-                    widget.product.currentPrice,
-                    bold: true,
-                  ),
                 ],
               ),
             ),
@@ -258,20 +225,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               },
             ),
           ],
-        ],
-      ),
-    );
-  }
-
-  Widget _priceBreakdownRow(String label, double amount, {bool bold = false}) {
-    final style = TextStyle(fontWeight: bold ? FontWeight.w700 : FontWeight.w400);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: style),
-          Text('₹${amount.toStringAsFixed(2)}', style: style),
         ],
       ),
     );

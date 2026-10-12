@@ -21,6 +21,7 @@ class Product {
     this.taxRate = 0,
     this.basePrice = 0,
     this.taxAmount = 0,
+    this.tags = const [],
   });
 
   final String id;
@@ -46,6 +47,13 @@ class Product {
   final double taxRate;
   final double basePrice;
   final double taxAmount;
+
+  /// Free-text labels set in Atlas (e.g. "BOGO") — lets an Offer banner
+  /// link to this product by tag. Compared case-insensitively.
+  final List<String> tags;
+
+  bool hasTag(String tag) =>
+      tags.any((t) => t.toLowerCase() == tag.toLowerCase());
 
   String get primaryImageUrl => imageUrls.isEmpty ? '' : imageUrls.first;
   double get currentPrice => discountedPrice > 0 ? discountedPrice : price;
@@ -125,6 +133,7 @@ class Product {
       taxRate: _parsePrice(json['taxRate']),
       basePrice: _parsePrice(json['basePrice']),
       taxAmount: _parsePrice(json['taxAmount']),
+      tags: (json['tags'] as List?)?.whereType<String>().toList() ?? const [],
     );
   }
 }

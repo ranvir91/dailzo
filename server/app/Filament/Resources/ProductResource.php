@@ -48,6 +48,17 @@ class ProductResource extends Resource
                     ->searchable(),
                 Forms\Components\TextInput::make('part_no')->label('Part no.')->maxLength(255),
                 Forms\Components\Textarea::make('description')->rows(3)->columnSpanFull(),
+                Forms\Components\TagsInput::make('tags')
+                    ->suggestions(fn () => Product::query()
+                        ->whereNotNull('tags')
+                        ->pluck('tags')
+                        ->flatten()
+                        ->unique()
+                        ->values()
+                        ->all())
+                    ->placeholder('BOGO, Combo, Festive…')
+                    ->helperText('Lets an Offer banner (Marketing > Offers) link to this product — e.g. tag it "BOGO" and a BOGO offer\'s banner will open every product carrying that tag.')
+                    ->columnSpanFull(),
             ])->columns(3),
 
             Forms\Components\Section::make('Pricing & stock')->schema([
@@ -107,6 +118,7 @@ class ProductResource extends Resource
                 Tables\Columns\TextColumn::make('discounted_price')->money('INR')->placeholder('—')->sortable(),
                 Tables\Columns\TextColumn::make('purchase_price')->money('INR')->placeholder('—')->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('unit')->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('tags')->badge()->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('stock')->numeric()->sortable()
                     ->color(fn ($state) => $state > 0 ? 'success' : 'danger'),
                 Tables\Columns\TextColumn::make('sort_order')->numeric()->sortable()->toggleable(),

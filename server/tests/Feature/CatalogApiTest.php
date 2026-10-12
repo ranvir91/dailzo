@@ -144,6 +144,37 @@ class CatalogApiTest extends TestCase
             ->assertJsonPath('data.sku', 'DUP-1-OWN');
     }
 
+    public function test_creating_a_product_persists_tags(): void
+    {
+        $category = Category::factory()->create();
+
+        $this->actingAsUser(User::factory()->admin()->create())
+            ->postJson('/api/v1/products', [
+                'name' => 'Combo Pack',
+                'price' => 199,
+                'stock' => 5,
+                'categoryId' => $category->id,
+                'tags' => ['BOGO', 'Combo'],
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.tags', ['BOGO', 'Combo']);
+
+        $this->assertDatabaseHas('products', ['name' => 'Combo Pack']);
+        $this->assertSame(['BOGO', 'Combo'], Product::where('name', 'Combo Pack')->firstOrFail()->tags);
+    }
+
+    public function test_updating_a_product_replaces_its_tags(): void
+    {
+        $product = Product::factory()->create(['tags' => ['BOGO']]);
+
+        $this->actingAsUser(User::factory()->admin()->create())
+            ->patchJson("/api/v1/products/{$product->id}", ['tags' => ['Festive']])
+            ->assertOk()
+            ->assertJsonPath('data.tags', ['Festive']);
+
+        $this->assertSame(['Festive'], $product->fresh()->tags);
+    }
+
     public function test_order_item_snapshots_the_tax_rate_at_order_time(): void
     {
         $category = Category::factory()->create(['tax_rate' => 18]);

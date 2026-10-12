@@ -57,6 +57,7 @@ class ProductController extends Controller
             'discounted_price' => $data['discountedPrice'] ?? null,
             'purchase_price' => $data['purchasePrice'] ?? null,
             'part_no' => $data['partNo'] ?? null,
+            'tags' => $data['tags'] ?? [],
             'stock' => $data['stock'],
             'images' => UploadPath::normalizeMany($data['images'] ?? []),
             'sort_order' => $data['sortOrder'] ?? 0,
@@ -103,6 +104,9 @@ class ProductController extends Controller
         }
         if (array_key_exists('images', $data)) {
             $product->images = UploadPath::normalizeMany($data['images'] ?? []);
+        }
+        if (array_key_exists('tags', $data)) {
+            $product->tags = $data['tags'] ?? [];
         }
         if (! empty($data['categoryId']) || ! empty($data['category'])) {
             $category = $this->resolveCategory($data['categoryId'] ?? null, $data['category'] ?? null);
@@ -153,6 +157,8 @@ class ProductController extends Controller
             'discountedPrice' => ['sometimes', 'nullable'],
             'purchasePrice' => ['sometimes', 'nullable'],
             'partNo' => ['sometimes', 'nullable', 'string'],
+            'tags' => ['sometimes', 'array'],
+            'tags.*' => ['string'],
             'stock' => [$creating ? 'required' : 'sometimes', 'integer', 'min:0'],
             'images' => ['sometimes', 'array'],
             'images.*' => ['string'],
