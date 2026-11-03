@@ -35,11 +35,10 @@ class Product extends Model
         'sku',
         'item_code',
         'hsn_sac_code',
-        'brand',
+        'brand_id',
         'unit',
         'category_id',
         'price',
-        'mrp',
         'discounted_price',
         'purchase_price',
         'part_no',
@@ -48,6 +47,10 @@ class Product extends Model
         'reserved',
         'images',
         'sort_order',
+        'is_active',
+        'is_freebie',
+        'freebie_price',
+        'freebie_min_order_value',
     ];
 
     /**
@@ -66,13 +69,21 @@ class Product extends Model
             'images' => 'array',
             'tags' => 'array',
             'price' => 'decimal:2',
-            'mrp' => 'decimal:2',
             'discounted_price' => 'decimal:2',
             'purchase_price' => 'decimal:2',
             'stock' => 'integer',
             'reserved' => 'integer',
             'sort_order' => 'integer',
+            'is_active' => 'boolean',
+            'is_freebie' => 'boolean',
+            'freebie_price' => 'decimal:2',
+            'freebie_min_order_value' => 'decimal:2',
         ];
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
     }
 
     public function category()
@@ -80,7 +91,12 @@ class Product extends Model
         return $this->belongsTo(Category::class);
     }
 
-    /** The tax-inclusive price actually charged — discounted price when set, else the list price. */
+    public function brand()
+    {
+        return $this->belongsTo(Brand::class);
+    }
+
+    /** The tax-inclusive price actually charged — discounted price when set, else `price` (the MRP). */
     public function sellingPrice(): float
     {
         $discounted = (float) ($this->discounted_price ?? 0);

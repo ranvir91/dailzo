@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class AuthTest extends TestCase
@@ -30,6 +31,31 @@ class AuthTest extends TestCase
         $this->postJson('/api/v1/auth/send-otp', ['phone' => '9800000002'])
             ->assertOk()
             ->assertJsonMissingPath('data.otp');
+    }
+
+    public function test_send_otp_sends_an_sms_containing_the_otp(): void
+    {
+        config([
+            'sms.enabled' => true,
+            'sms.templates.otp.dlt_template_id' => 'dlt-otp',
+        ]);
+        Http::fake(['*' => Http::response('000', 200)]);
+
+        $this->postJson('/api/v1/auth/send-otp', ['phone' => '9800000099'])->assertOk();
+
+        $otp = Cache::get('otp:9800000099');
+        Http::assertSent(fn ($request) => str_contains($request['text'], $otp)
+            && $request['number'] === '919800000099');
+    }
+
+    public function test_send_otp_does_not_call_the_gateway_when_sms_is_disabled(): void
+    {
+        config(['sms.enabled' => false]);
+        Http::fake();
+
+        $this->postJson('/api/v1/auth/send-otp', ['phone' => '9800000098'])->assertOk();
+
+        Http::assertNothingSent();
     }
 
     public function test_login_creates_a_user_and_issues_tokens(): void

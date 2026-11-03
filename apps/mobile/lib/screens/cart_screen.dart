@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/cart.dart';
 import '../models/product.dart';
+import '../services/freebie_pricing.dart';
 
 class CartScreen extends StatelessWidget {
   const CartScreen({
@@ -16,6 +17,7 @@ class CartScreen extends StatelessWidget {
     this.minOrderValueEnabled = false,
     this.minOrderValue = 0,
     this.deliveryCharges = 0,
+    this.maxFreebieQuantityPerOrder = 1,
   });
 
   final Cart cart;
@@ -29,20 +31,28 @@ class CartScreen extends StatelessWidget {
   final bool minOrderValueEnabled;
   final double minOrderValue;
   final double deliveryCharges;
+  final int maxFreebieQuantityPerOrder;
 
-  double _subtotal() {
+  double _subtotal(Map<String, double> effectivePrices) {
     var total = 0.0;
     for (final item in cart.items) {
-      final product = productsById[item.productId];
-      if (product == null) continue;
-      total += product.currentPrice * item.quantity;
+      final price = effectivePrices[item.id];
+      if (price == null) continue;
+      total += price * item.quantity;
     }
     return total;
   }
 
   @override
   Widget build(BuildContext context) {
-    final subtotal = _subtotal();
+    final effectivePrices = FreebiePricing.effectivePrices(
+      cart: cart,
+      productsById: productsById,
+      maxFreebieQuantityPerOrder: maxFreebieQuantityPerOrder,
+    );
+    final freebieUnitsInCart =
+        FreebiePricing.freebieUnitsInCart(cart: cart, productsById: productsById);
+    final subtotal = _subtotal(effectivePrices);
     final delivery = cart.items.isEmpty ? 0.0 : deliveryCharges;
     final total = subtotal + delivery;
     final belowMinimum = minOrderValueEnabled && subtotal < minOrderValue;
@@ -80,7 +90,16 @@ class CartScreen extends StatelessWidget {
                         final item = cart.items[index];
                         final product = productsById[item.productId];
                         final title = product?.name ?? item.productId;
-                        final unitPrice = product?.currentPrice ?? 0.0;
+                        final unitPrice = effectivePrices[item.id] ?? 0.0;
+                        final isFreebiePrice =
+                            product != null && product.isFreebie && unitPrice == product.freebiePrice;
+                        // Incrementing any freebie line once the shared cap
+                        // is used up won't get the freebie price for the new
+                        // unit (server caps it) — keep the button disabled
+                        // there rather than let the customer silently lose it.
+                        final atMaxFreebieQuantity = product != null &&
+                            product.isFreebie &&
+                            freebieUnitsInCart >= maxFreebieQuantityPerOrder;
                         final imageUrl = product?.primaryImageUrl ?? '';
                         return Card(
                           child: ListTile(
@@ -111,8 +130,17 @@ class CartScreen extends StatelessWidget {
                                   fontSize: 13, fontWeight: FontWeight.w600),
                             ),
                             subtitle: Text(
-                              'Qty ${item.quantity} • ₹${unitPrice.toStringAsFixed(0)} each',
-                              style: const TextStyle(fontSize: 11),
+                              isFreebiePrice
+                                  ? 'Qty ${item.quantity} • ₹${unitPrice.toStringAsFixed(0)} freebie price'
+                                  : 'Qty ${item.quantity} • ₹${unitPrice.toStringAsFixed(0)} each',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isFreebiePrice
+                                    ? Theme.of(context).colorScheme.primary
+                                    : null,
+                                fontWeight:
+                                    isFreebiePrice ? FontWeight.w700 : null,
+                              ),
                             ),
                             trailing: Wrap(
                               spacing: 6,
@@ -127,11 +155,13 @@ class CartScreen extends StatelessWidget {
                                       size: 20),
                                 ),
                                 IconButton(
-                                  onPressed: () {
-                                    onUpdateQuantity(
-                                        itemId: item.id,
-                                        quantity: item.quantity + 1);
-                                  },
+                                  onPressed: atMaxFreebieQuantity
+                                      ? null
+                                      : () {
+                                          onUpdateQuantity(
+                                              itemId: item.id,
+                                              quantity: item.quantity + 1);
+                                        },
                                   icon: const Icon(Icons.add_circle_outline,
                                       size: 20),
                                 ),

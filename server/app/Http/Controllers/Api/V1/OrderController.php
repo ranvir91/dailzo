@@ -8,10 +8,12 @@ use App\Models\Product;
 use App\Models\StoreSetting;
 use App\Services\CouponService;
 use App\Services\InvoiceService;
+use App\Services\SmsService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
@@ -21,6 +23,7 @@ class OrderController extends Controller
     public function __construct(
         private readonly CouponService $coupons,
         private readonly InvoiceService $invoices,
+        private readonly SmsService $sms,
     ) {}
 
     public function store(Request $request): JsonResponse
@@ -51,9 +54,13 @@ class OrderController extends Controller
         // changing later never rewrites an already-placed order's invoice.
         $taxRates = $products->map(fn (Product $p) => (float) ($p->category?->tax_rate ?? 0));
 
-        // Also snapshotted — the invoice's MRP/discount columns must stay
-        // frozen even if a product's mrp changes after the order is placed.
-        $mrps = $products->map(fn (Product $p) => (float) ($p->mrp ?? 0));
+        // order_items.mrp snapshots the product's MRP (= price, now that
+        // there's no separate mrp field) at order time, distinct from the
+        // above $prices (what was actually charged) — the invoice's
+        // MRP/discount columns must stay frozen even if price changes later.
+        $mrps = $products->map(fn (Product $p) => (float) $p->price);
+
+        $this->applyFreebiePricing($data['items'], $prices, $products, $settings);
 
         $subtotal = collect($data['items'])
             ->sum(fn (array $item) => ($prices[$item['productId']] ?? 0) * $item['quantity']);
@@ -100,6 +107,13 @@ class OrderController extends Controller
 
             return $order;
         });
+
+        if ($request->user()->phone) {
+            $this->sms->send($request->user()->phone, 'order_placed', [
+                'orderId' => $order->id,
+                'total' => number_format((float) $order->total, 2),
+            ]);
+        }
 
         return ApiResponse::success($order->load(self::WITH), 'Order created successfully');
     }
@@ -180,5 +194,64 @@ class OrderController extends Controller
         }
 
         return $query->first();
+    }
+
+    /**
+     * Overrides $prices in place for any item that qualifies as a freebie —
+     * never trusts the client for this, re-derived from scratch server-side
+     * every time:
+     *
+     *   - the product must have is_freebie = true
+     *   - every OTHER item in the cart (i.e. not itself a freebie product),
+     *     priced normally, must already total at least THIS product's own
+     *     freebie_min_order_value (different freebie products may unlock at
+     *     different spend levels)
+     *   - the TOTAL quantity of freebie units charged at freebie price in
+     *     this order — summed across every distinct freebie product, not
+     *     just this one — must not exceed
+     *     store_settings.max_freebie_quantity_per_order. This is a single
+     *     store-wide cap rather than a per-product one: capping per product
+     *     let a customer pick up 1 of freebie A *and* 1 of freebie B when
+     *     only one freebie total was intended, which was a real bug.
+     *
+     * Freebie items are processed in cart order; once the global cap is
+     * used up, any further freebie lines (whether the same or a different
+     * product) revert to normal pricing — a line is never split into a
+     * freebie-priced portion plus a normal-priced one.
+     *
+     * @param  array<int, array{productId: int, quantity: int}>  $items
+     * @param  Collection<int, Product>  $products  Keyed by product id.
+     */
+    private function applyFreebiePricing(array $items, Collection $prices, Collection $products, StoreSetting $settings): void
+    {
+        $isFreebieItem = fn (array $item) => (bool) $products->get($item['productId'])?->is_freebie;
+
+        $freebieItems = collect($items)->filter($isFreebieItem);
+        if ($freebieItems->isEmpty()) {
+            return;
+        }
+
+        $regularSubtotal = collect($items)
+            ->reject($isFreebieItem)
+            ->sum(fn (array $item) => ($prices[$item['productId']] ?? 0) * $item['quantity']);
+
+        $remaining = (int) $settings->max_freebie_quantity_per_order;
+
+        foreach ($freebieItems as $item) {
+            if ($remaining <= 0) {
+                break;
+            }
+
+            $product = $products->get($item['productId']);
+            if ($regularSubtotal < (float) $product->freebie_min_order_value) {
+                continue;
+            }
+
+            $qty = $item['quantity'];
+            if ($qty <= $remaining) {
+                $prices[$item['productId']] = (float) $product->freebie_price;
+                $remaining -= $qty;
+            }
+        }
     }
 }

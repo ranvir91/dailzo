@@ -7,6 +7,7 @@ use App\Models\DeliveryPartner;
 use App\Models\Order;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class PartnerApiTest extends TestCase
@@ -127,6 +128,57 @@ class PartnerApiTest extends TestCase
         $this->actingAsPartner($partner)
             ->patchJson("/api/v1/partner/orders/{$order->id}/status", ['status' => 'OUT_FOR_DELIVERY'])
             ->assertStatus(400);
+    }
+
+    public function test_marking_out_for_delivery_sends_an_sms_with_the_delivery_otp(): void
+    {
+        config([
+            'dailzo.otp_debug' => true,
+            'sms.enabled' => true,
+            'sms.templates.order_out_for_delivery.dlt_template_id' => 'dlt-ofd',
+        ]);
+        Http::fake(['*' => Http::response('000', 200)]);
+
+        $partner = DeliveryPartner::factory()->create();
+        $customer = User::factory()->create(['phone' => '9800000066']);
+        $order = Order::factory()->create(['status' => 'ASSIGNED', 'user_id' => $customer->id]);
+        DeliveryAssignment::create(['order_id' => $order->id, 'delivery_partner_id' => $partner->id, 'status' => 'ASSIGNED']);
+
+        $response = $this->actingAsPartner($partner)
+            ->patchJson("/api/v1/partner/orders/{$order->id}/status", ['status' => 'OUT_FOR_DELIVERY'])
+            ->assertOk();
+
+        $otp = $response->json('data.deliveryOtp');
+        Http::assertSent(fn ($request) => $request['number'] === '919800000066'
+            && str_contains($request['text'], 'out for delivery')
+            && str_contains($request['text'], $otp));
+    }
+
+    public function test_marking_delivered_sends_an_sms(): void
+    {
+        config([
+            'dailzo.otp_debug' => true,
+            'sms.enabled' => true,
+            'sms.templates.order_out_for_delivery.dlt_template_id' => 'dlt-ofd',
+            'sms.templates.order_delivered.dlt_template_id' => 'dlt-delivered',
+        ]);
+        Http::fake(['*' => Http::response('000', 200)]);
+
+        $partner = DeliveryPartner::factory()->create();
+        $customer = User::factory()->create(['phone' => '9800000055']);
+        $order = Order::factory()->create(['status' => 'ASSIGNED', 'user_id' => $customer->id]);
+        DeliveryAssignment::create(['order_id' => $order->id, 'delivery_partner_id' => $partner->id, 'status' => 'ASSIGNED']);
+
+        $otp = $this->actingAsPartner($partner)
+            ->patchJson("/api/v1/partner/orders/{$order->id}/status", ['status' => 'OUT_FOR_DELIVERY'])
+            ->json('data.deliveryOtp');
+
+        $this->actingAsPartner($partner)
+            ->patchJson("/api/v1/partner/orders/{$order->id}/status", ['status' => 'COMPLETED', 'otp' => $otp])
+            ->assertOk();
+
+        Http::assertSent(fn ($request) => $request['number'] === '919800000055'
+            && str_contains($request['text'], 'has been delivered'));
     }
 
     public function test_completing_an_order_requires_the_delivery_otp_sent_when_it_went_out_for_delivery(): void

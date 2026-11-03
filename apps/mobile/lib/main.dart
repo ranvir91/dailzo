@@ -21,6 +21,8 @@ import 'screens/product_detail_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/tagged_products_screen.dart';
 import 'services/api_service.dart';
+import 'services/freebie_pricing.dart';
+import 'widgets/freebie_unlocked_sheet.dart';
 import 'widgets/product_tile.dart';
 
 void main() {
@@ -112,12 +114,19 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Address> _addresses = const [];
   List<Coupon> _coupons = const [];
   List<Offer> _offers = const [];
+  // Tracks which freebie products have already been offered via the
+  // "unlocked" sheet for the current threshold crossing, so it doesn't
+  // re-pop on every cart refresh — cleared for a product once its own
+  // threshold is no longer met, so crossing it again later re-triggers it.
+  final Set<String> _freebieSheetShownForProductIds = {};
+  bool _freebieSheetOpen = false;
   List<Order> _orders = const [];
   List<ServiceablePincode> _serviceablePincodes = const [];
   UserProfile? _profile;
   bool _minOrderValueEnabled = false;
   double _minOrderValue = 0;
   double _deliveryCharges = 0;
+  int _maxFreebieQuantityPerOrder = 1;
 
   @override
   void initState() {
@@ -216,7 +225,8 @@ class _HomeScreenState extends State<HomeScreen> {
       final storeSettings = results[8] as ({
         bool minOrderValueEnabled,
         double minOrderValue,
-        double deliveryCharges
+        double deliveryCharges,
+        int maxFreebieQuantityPerOrder,
       });
       setState(() {
         _categories = results[0] as List<Category>;
@@ -231,10 +241,12 @@ class _HomeScreenState extends State<HomeScreen> {
         _minOrderValueEnabled = storeSettings.minOrderValueEnabled;
         _minOrderValue = storeSettings.minOrderValue;
         _deliveryCharges = storeSettings.deliveryCharges;
+        _maxFreebieQuantityPerOrder = storeSettings.maxFreebieQuantityPerOrder;
         if (_selectedPincode.isEmpty && pincodes.isNotEmpty) {
           _selectedPincode = pincodes.first.pincode;
         }
       });
+      _checkFreebieUnlocks();
     } catch (error) {
       if (!mounted) return;
       setState(() => _error = error.toString());
@@ -243,10 +255,57 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// Shows the "freebie unlocked" bottom sheet for whichever freebie
+  /// products just crossed their own threshold and haven't already been
+  /// offered — called after every cart mutation. Never shows a second sheet
+  /// on top of one already open; a product whose threshold is no longer met
+  /// is un-marked so crossing it again later re-triggers the sheet.
+  void _checkFreebieUnlocks() {
+    if (_freebieSheetOpen) return;
+
+    final productsById = _productMap();
+    final subtotal = FreebiePricing.regularSubtotal(cart: _cart, productsById: productsById);
+    final freebieUnitsInCart =
+        FreebiePricing.freebieUnitsInCart(cart: _cart, productsById: productsById);
+    final remainingCap = _maxFreebieQuantityPerOrder - freebieUnitsInCart;
+
+    final eligibleProducts = <Product>[];
+    for (final product in _products) {
+      if (!product.isFreebie) continue;
+      final met = subtotal >= product.freebieMinOrderValue;
+
+      if (!met) {
+        _freebieSheetShownForProductIds.remove(product.id);
+        continue;
+      }
+      if (_freebieSheetShownForProductIds.contains(product.id)) continue;
+
+      final alreadyInCart =
+          _cart.items.any((item) => item.productId == product.id);
+      if (alreadyInCart || remainingCap <= 0) continue;
+
+      eligibleProducts.add(product);
+    }
+    if (eligibleProducts.isEmpty) return;
+
+    for (final product in eligibleProducts) {
+      _freebieSheetShownForProductIds.add(product.id);
+    }
+    _freebieSheetOpen = true;
+    showFreebieUnlockedSheet(
+      context,
+      products: eligibleProducts,
+      maxFreebieQuantityPerOrder: _maxFreebieQuantityPerOrder,
+      alreadyInCartCount: freebieUnitsInCart,
+      onAddToCart: _addToCart,
+    ).whenComplete(() => _freebieSheetOpen = false);
+  }
+
   Future<void> _refreshCart() async {
     final cart = await ApiService.instance.fetchCart();
     if (!mounted) return;
     setState(() => _cart = cart);
+    _checkFreebieUnlocks();
   }
 
   Future<void> _refreshOrders() async {
@@ -416,6 +475,7 @@ class _HomeScreenState extends State<HomeScreen> {
           minOrderValueEnabled: _minOrderValueEnabled,
           minOrderValue: _minOrderValue,
           deliveryCharges: _deliveryCharges,
+          maxFreebieQuantityPerOrder: _maxFreebieQuantityPerOrder,
           onAddAddress: _addAddressFromCheckout,
           onOrderPlaced: () async {
             await _refreshCart();
@@ -1021,6 +1081,7 @@ class _HomeScreenState extends State<HomeScreen> {
           minOrderValueEnabled: _minOrderValueEnabled,
           minOrderValue: _minOrderValue,
           deliveryCharges: _deliveryCharges,
+          maxFreebieQuantityPerOrder: _maxFreebieQuantityPerOrder,
           onRefresh: _refreshCart,
           onRemoveItem: _removeCartItem,
           onUpdateQuantity: _updateCartItemQuantity,

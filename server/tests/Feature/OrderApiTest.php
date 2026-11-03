@@ -48,6 +48,150 @@ class OrderApiTest extends TestCase
         ])->assertStatus(400)->assertJsonPath('success', false);
     }
 
+    private function freebieProduct(array $overrides = []): Product
+    {
+        return Product::factory()->create(array_merge([
+            'price' => 200,
+            'discounted_price' => null,
+            'is_freebie' => true,
+            'freebie_price' => 1,
+            'freebie_min_order_value' => 500,
+        ], $overrides));
+    }
+
+    public function test_a_freebie_product_is_charged_the_freebie_price_once_its_threshold_is_met(): void
+    {
+        $customer = User::factory()->create();
+        $regular = Product::factory()->create(['price' => 600, 'discounted_price' => null]);
+        $freebie = $this->freebieProduct();
+
+        $response = $this->actingAsUser($customer)->postJson('/api/v1/orders', [
+            'paymentMethod' => 'COD',
+            'total' => 601,
+            'items' => [
+                ['productId' => $regular->id, 'quantity' => 1],
+                ['productId' => $freebie->id, 'quantity' => 1],
+            ],
+        ])->assertOk();
+
+        $items = collect($response->json('data.items'));
+        $this->assertSame('600.00', $items->firstWhere('productId', $regular->id)['price']);
+        $this->assertSame('1.00', $items->firstWhere('productId', $freebie->id)['price']);
+        // MRP is still snapshotted at the real price, so the invoice can show
+        // the full discount even though only Rs.1 was charged.
+        $this->assertSame('200.00', $items->firstWhere('productId', $freebie->id)['mrp']);
+    }
+
+    public function test_a_freebie_product_is_charged_normally_when_its_threshold_is_not_met(): void
+    {
+        $customer = User::factory()->create();
+        $regular = Product::factory()->create(['price' => 100, 'discounted_price' => null]);
+        $freebie = $this->freebieProduct();
+
+        $response = $this->actingAsUser($customer)->postJson('/api/v1/orders', [
+            'paymentMethod' => 'COD',
+            'total' => 300,
+            'items' => [
+                ['productId' => $regular->id, 'quantity' => 1],
+                ['productId' => $freebie->id, 'quantity' => 1],
+            ],
+        ])->assertOk();
+
+        $items = collect($response->json('data.items'));
+        $this->assertSame('200.00', $items->firstWhere('productId', $freebie->id)['price']);
+    }
+
+    public function test_only_the_store_configured_quantity_of_freebies_is_charged_the_freebie_price(): void
+    {
+        StoreSetting::current()->update(['max_freebie_quantity_per_order' => 1]);
+        $customer = User::factory()->create();
+        $regular = Product::factory()->create(['price' => 600, 'discounted_price' => null]);
+        $freebie = $this->freebieProduct();
+
+        $response = $this->actingAsUser($customer)->postJson('/api/v1/orders', [
+            'paymentMethod' => 'COD',
+            'total' => 602,
+            'items' => [
+                ['productId' => $regular->id, 'quantity' => 1],
+                ['productId' => $freebie->id, 'quantity' => 2],
+            ],
+        ])->assertOk();
+
+        // 2 units requested but the store cap is 1 — the whole line (not a
+        // partial split) reverts to normal pricing.
+        $items = collect($response->json('data.items'));
+        $this->assertSame('200.00', $items->firstWhere('productId', $freebie->id)['price']);
+    }
+
+    public function test_the_global_freebie_cap_applies_across_different_freebie_products_not_per_product(): void
+    {
+        // The bug this fixes: two DIFFERENT freebie products, cap of 1 total
+        // — previously each product was capped independently, so a customer
+        // could add 1 of each (2 freebies) when only 1 total was intended.
+        StoreSetting::current()->update(['max_freebie_quantity_per_order' => 1]);
+        $customer = User::factory()->create();
+        $regular = Product::factory()->create(['price' => 600, 'discounted_price' => null]);
+        $freebieA = $this->freebieProduct(['price' => 150]);
+        $freebieB = $this->freebieProduct(['price' => 250]);
+
+        $response = $this->actingAsUser($customer)->postJson('/api/v1/orders', [
+            'paymentMethod' => 'COD',
+            'total' => 602,
+            'items' => [
+                ['productId' => $regular->id, 'quantity' => 1],
+                ['productId' => $freebieA->id, 'quantity' => 1],
+                ['productId' => $freebieB->id, 'quantity' => 1],
+            ],
+        ])->assertOk();
+
+        $items = collect($response->json('data.items'));
+        $prices = [
+            $items->firstWhere('productId', $freebieA->id)['price'],
+            $items->firstWhere('productId', $freebieB->id)['price'],
+        ];
+        // Exactly one of the two got the freebie price, not both.
+        $this->assertCount(1, array_filter($prices, fn ($p) => $p === '1.00'));
+        $this->assertCount(1, array_filter($prices, fn ($p) => $p !== '1.00'));
+    }
+
+    public function test_a_freebie_product_is_charged_normally_when_is_freebie_is_off(): void
+    {
+        $customer = User::factory()->create();
+        $regular = Product::factory()->create(['price' => 600, 'discounted_price' => null]);
+        $freebie = $this->freebieProduct(['is_freebie' => false]);
+
+        $response = $this->actingAsUser($customer)->postJson('/api/v1/orders', [
+            'paymentMethod' => 'COD',
+            'total' => 800,
+            'items' => [
+                ['productId' => $regular->id, 'quantity' => 1],
+                ['productId' => $freebie->id, 'quantity' => 1],
+            ],
+        ])->assertOk();
+
+        $items = collect($response->json('data.items'));
+        $this->assertSame('200.00', $items->firstWhere('productId', $freebie->id)['price']);
+    }
+
+    public function test_a_freebie_products_own_price_does_not_count_toward_its_own_threshold(): void
+    {
+        $customer = User::factory()->create();
+        // Only the freebie product itself in the cart — its own price must
+        // not count toward unlocking its own threshold.
+        $freebie = $this->freebieProduct(['price' => 600]);
+
+        $response = $this->actingAsUser($customer)->postJson('/api/v1/orders', [
+            'paymentMethod' => 'COD',
+            'total' => 600,
+            'items' => [
+                ['productId' => $freebie->id, 'quantity' => 1],
+            ],
+        ])->assertOk();
+
+        $items = collect($response->json('data.items'));
+        $this->assertSame('600.00', $items->firstWhere('productId', $freebie->id)['price']);
+    }
+
     public function test_delivery_charges_are_snapshotted_at_order_time_not_recomputed_later(): void
     {
         StoreSetting::current()->update(['delivery_charges' => 49]);

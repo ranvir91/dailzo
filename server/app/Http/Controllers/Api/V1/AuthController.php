@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\RefreshToken;
 use App\Models\User;
 use App\Services\OtpService;
+use App\Services\SmsService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,8 +14,10 @@ use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
-    public function __construct(private readonly OtpService $otp)
-    {
+    public function __construct(
+        private readonly OtpService $otp,
+        private readonly SmsService $sms,
+    ) {
     }
 
     public function sendOtp(Request $request): JsonResponse
@@ -22,6 +25,11 @@ class AuthController extends Controller
         $data = $request->validate(['phone' => ['required', 'string']]);
 
         $otp = $this->otp->generate($data['phone']);
+
+        $this->sms->send($data['phone'], 'otp', [
+            'otp' => $otp,
+            'minutes' => (int) ceil(config('dailzo.otp_ttl') / 60),
+        ]);
 
         $payload = ['phone' => $data['phone'], 'expiresIn' => config('dailzo.otp_ttl')];
         if (config('dailzo.otp_debug')) {

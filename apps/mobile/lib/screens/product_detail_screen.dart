@@ -95,7 +95,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               if (widget.product.discountPercent > 0) ...[
                 const SizedBox(width: 10),
                 Text(
-                  '₹${widget.product.originalPrice.toStringAsFixed(0)}',
+                  'MRP ₹${widget.product.originalPrice.toStringAsFixed(0)}',
                   style: TextStyle(
                     color: Colors.grey.shade700,
                     decoration: TextDecoration.lineThrough,
@@ -121,13 +121,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ],
             ],
           ),
-          if (widget.product.mrp > widget.product.currentPrice) ...[
-            const SizedBox(height: 2),
-            Text(
-              'MRP ₹${widget.product.mrp.toStringAsFixed(2)} (incl. of all taxes)',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-            ),
-          ],
           if (widget.product.unit.isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(widget.product.unit,

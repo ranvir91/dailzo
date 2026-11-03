@@ -17,17 +17,22 @@ class Product {
     this.brand = '',
     this.unit = '',
     this.hsnSacCode = '',
-    this.mrp = 0,
     this.taxRate = 0,
     this.basePrice = 0,
     this.taxAmount = 0,
     this.tags = const [],
+    this.isFreebie = false,
+    this.freebiePrice = 1,
+    this.freebieMinOrderValue = 0,
   });
 
   final String id;
   final String name;
   final String description;
   final String sku;
+
+  /// The MRP (Maximum Retail Price), tax-inclusive. Shown struck through
+  /// (see [originalPrice]) whenever [discountedPrice] is set.
   final double price;
   final double discountedPrice;
   final int stock;
@@ -39,7 +44,6 @@ class Product {
   final String brand;
   final String unit;
   final String hsnSacCode;
-  final double mrp;
 
   /// Pre-split from the tax-inclusive selling price by the backend (see
   /// Product::getBasePriceAttribute) using the category's current tax_rate —
@@ -51,6 +55,14 @@ class Product {
   /// Free-text labels set in Atlas (e.g. "BOGO") — lets an Offer banner
   /// link to this product by tag. Compared case-insensitively.
   final List<String> tags;
+
+  /// When true, this product becomes addable at [freebiePrice] once the
+  /// rest of the cart reaches [freebieMinOrderValue]. How many freebie
+  /// units a customer may add in total per order (across any freebie
+  /// product) is a single store-wide setting — see DealPricing.
+  final bool isFreebie;
+  final double freebiePrice;
+  final double freebieMinOrderValue;
 
   bool hasTag(String tag) =>
       tags.any((t) => t.toLowerCase() == tag.toLowerCase());
@@ -126,14 +138,19 @@ class Product {
           : (json['category']?.toString() ?? 'Groceries'),
       imageUrls: uniqueImageUrls,
       sortOrder: int.tryParse(json['sortOrder']?.toString() ?? '0') ?? 0,
-      brand: json['brand']?.toString() ?? '',
+      brand: json['brand'] is Map<String, dynamic>
+          ? (json['brand']['name']?.toString() ?? '')
+          : (json['brand']?.toString() ?? ''),
       unit: json['unit']?.toString() ?? '',
       hsnSacCode: json['hsnSacCode']?.toString() ?? '',
-      mrp: _parsePrice(json['mrp']),
       taxRate: _parsePrice(json['taxRate']),
       basePrice: _parsePrice(json['basePrice']),
       taxAmount: _parsePrice(json['taxAmount']),
       tags: (json['tags'] as List?)?.whereType<String>().toList() ?? const [],
+      isFreebie: json['isFreebie'] == true,
+      freebiePrice: double.tryParse(json['freebiePrice']?.toString() ?? '') ?? 1,
+      freebieMinOrderValue:
+          double.tryParse(json['freebieMinOrderValue']?.toString() ?? '') ?? 0,
     );
   }
 }

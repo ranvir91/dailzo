@@ -5,6 +5,7 @@ import '../models/cart.dart';
 import '../models/coupon.dart';
 import '../models/product.dart';
 import '../services/api_service.dart';
+import '../services/freebie_pricing.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({
@@ -19,6 +20,7 @@ class CheckoutScreen extends StatefulWidget {
     this.minOrderValueEnabled = false,
     this.minOrderValue = 0,
     this.deliveryCharges = 0,
+    this.maxFreebieQuantityPerOrder = 1,
   });
 
   final Cart cart;
@@ -36,6 +38,7 @@ class CheckoutScreen extends StatefulWidget {
   final bool minOrderValueEnabled;
   final double minOrderValue;
   final double deliveryCharges;
+  final int maxFreebieQuantityPerOrder;
 
   @override
   State<CheckoutScreen> createState() => _CheckoutScreenState();
@@ -79,11 +82,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   double _subtotal() {
+    final effectivePrices = FreebiePricing.effectivePrices(
+      cart: widget.cart,
+      productsById: widget.productsById,
+      maxFreebieQuantityPerOrder: widget.maxFreebieQuantityPerOrder,
+    );
     var total = 0.0;
     for (final item in widget.cart.items) {
-      final product = widget.productsById[item.productId];
-      if (product == null) continue;
-      total += product.price * item.quantity;
+      final price = effectivePrices[item.id];
+      if (price == null) continue;
+      total += price * item.quantity;
     }
     return total;
   }

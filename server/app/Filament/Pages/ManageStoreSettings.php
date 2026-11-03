@@ -38,6 +38,7 @@ class ManageStoreSettings extends Page implements HasForms
             'tax' => $s->tax,
             'min_order_value' => $s->min_order_value,
             'min_order_value_enabled' => $s->min_order_value_enabled,
+            'max_freebie_quantity_per_order' => $s->max_freebie_quantity_per_order,
             'maintenance_mode' => $s->maintenance_mode,
             'app_version' => $s->app_version,
             'store_open_time' => $s->store_open_time,
@@ -64,6 +65,14 @@ class ManageStoreSettings extends Page implements HasForms
                     TextInput::make('min_order_value')->numeric()->prefix('₹')->required(),
                     Toggle::make('min_order_value_enabled')->label('Enforce minimum order value'),
                 ])->columns(2),
+
+                Section::make('Freebies')
+                    ->description('How many freebie units a customer may add in total per order, across any product marked as a freebie (Catalog > Products). Each freebie product sets its own price and unlock threshold.')
+                    ->schema([
+                        TextInput::make('max_freebie_quantity_per_order')
+                            ->label('Max freebie units per order')
+                            ->numeric()->integer()->minValue(1)->default(1)->required(),
+                    ]),
 
                 Section::make('Store')->schema([
                     TextInput::make('app_version')->required(),

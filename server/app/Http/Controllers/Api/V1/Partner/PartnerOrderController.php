@@ -8,6 +8,7 @@ use App\Models\DeliveryPartner;
 use App\Models\Order;
 use App\Models\OrderComment;
 use App\Services\OtpService;
+use App\Services\SmsService;
 use App\Support\ApiResponse;
 use App\Support\IstDate;
 use Illuminate\Http\JsonResponse;
@@ -19,7 +20,10 @@ class PartnerOrderController extends Controller
 {
     private const WITH = ['order.user', 'order.address', 'order.items.product', 'order.comments.deliveryPartner'];
 
-    public function __construct(private readonly OtpService $otp) {}
+    public function __construct(
+        private readonly OtpService $otp,
+        private readonly SmsService $sms,
+    ) {}
 
     /**
      * Forward-only: a partner can hand an order off (OUT_FOR_DELIVERY) then
@@ -132,12 +136,20 @@ class PartnerOrderController extends Controller
 
         if ($targetAssignmentStatus === DeliveryAssignment::STATUS_OUT_FOR_DELIVERY && $customerPhone) {
             $otp = $this->otp->generate($customerPhone);
-            // No SMS gateway yet (same limitation as customer login OTP) — while
-            // OTP_DEBUG is on, hand it straight back so the partner app can show
-            // it during development instead of needing server log access.
+            // While OTP_DEBUG is on, also hand it straight back so the partner
+            // app can show it during development instead of needing server
+            // log/SMS access.
             if (config('dailzo.otp_debug')) {
                 $response['deliveryOtp'] = $otp;
             }
+            $this->sms->send($customerPhone, 'order_out_for_delivery', [
+                'orderId' => $order->id,
+                'otp' => $otp,
+            ]);
+        }
+
+        if ($targetAssignmentStatus === DeliveryAssignment::STATUS_DELIVERED && $customerPhone) {
+            $this->sms->send($customerPhone, 'order_delivered', ['orderId' => $order->id]);
         }
 
         return ApiResponse::success($response, 'Order status updated successfully');

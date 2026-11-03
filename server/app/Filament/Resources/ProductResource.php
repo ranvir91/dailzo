@@ -11,6 +11,8 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Str;
 
 class ProductResource extends Resource
 {
@@ -39,14 +41,22 @@ class ProductResource extends Resource
                 Forms\Components\TextInput::make('sku')->label('SKU code')->maxLength(255)->unique(ignoreRecord: true),
                 Forms\Components\TextInput::make('hsn_sac_code')->label('HSN/SAC code')->maxLength(255)
                     ->helperText('Required on GST invoices.'),
-                Forms\Components\TextInput::make('brand')->label('Brand / Make')->maxLength(255),
+                Forms\Components\Select::make('brand_id')
+                    ->label('Brand')
+                    ->relationship('brand', 'name')
+                    ->searchable()->preload()
+                    ->createOptionForm([
+                        Forms\Components\TextInput::make('name')->required()
+                            ->live(onBlur: true)
+                            ->afterStateUpdated(fn (Forms\Set $set, ?string $state) => $set('slug', Str::slug((string) $state))),
+                        Forms\Components\TextInput::make('slug')->required(),
+                    ]),
                 Forms\Components\Select::make('unit')->label('Item unit')
                     ->options([
                         'PCS' => 'PCS', 'KG' => 'KG', 'GM' => 'GM', 'L' => 'L',
                         'ML' => 'ML', 'BOX' => 'BOX', 'PACK' => 'PACK', 'DOZEN' => 'DOZEN',
                     ])
                     ->searchable(),
-                Forms\Components\TextInput::make('part_no')->label('Part no.')->maxLength(255),
                 Forms\Components\Textarea::make('description')->rows(3)->columnSpanFull(),
                 Forms\Components\TagsInput::make('tags')
                     ->suggestions(fn () => Product::query()
@@ -62,20 +72,18 @@ class ProductResource extends Resource
             ])->columns(3),
 
             Forms\Components\Section::make('Pricing & stock')->schema([
-                Forms\Components\TextInput::make('price')->label('Sales price')->numeric()->prefix('₹')
+                Forms\Components\TextInput::make('price')->label('MRP')->numeric()->prefix('₹')
                     ->required()->minValue(0)->live(onBlur: true)
-                    ->helperText('Tax-inclusive — this is what the customer pays.'),
-                Forms\Components\TextInput::make('mrp')->numeric()->prefix('₹')->minValue(0)
-                    ->helperText('Leave blank to just use the sales price.'),
-                Forms\Components\TextInput::make('discounted_price')->numeric()->prefix('₹')->minValue(0)
+                    ->helperText('Tax-inclusive Maximum Retail Price. Customers are charged this unless a selling price is set below.'),
+                Forms\Components\TextInput::make('discounted_price')->label('Selling price')->numeric()->prefix('₹')->minValue(0)
                     ->live(onBlur: true)
-                    ->helperText('Leave blank for no discount.'),
-                Forms\Components\TextInput::make('purchase_price')->label('Purchase price')->numeric()->prefix('₹')->minValue(0)
-                    ->helperText('Your cost — not shown to customers.'),
+                    ->helperText('The actual price customers pay — leave blank to charge the MRP directly.'),
                 Forms\Components\TextInput::make('stock')->numeric()->integer()->default(0)->minValue(0),
                 Forms\Components\TextInput::make('reserved')->numeric()->integer()->default(0)->minValue(0),
                 Forms\Components\TextInput::make('sort_order')->numeric()->integer()->default(0)
                     ->helperText('Lower numbers show first.'),
+                Forms\Components\Toggle::make('is_active')->label('Active')->default(true)
+                    ->helperText('Off hides this product from the storefront without deleting it.'),
                 Forms\Components\Placeholder::make('tax_breakdown')
                     ->label('Tax breakdown at this price')
                     ->content(function (Forms\Get $get) {
@@ -91,6 +99,25 @@ class ProductResource extends Resource
                     })
                     ->columnSpanFull(),
             ])->columns(3),
+
+            Forms\Components\Section::make('Freebie')
+                ->description('Once the rest of the customer\'s cart reaches the minimum order value, this product becomes addable at the freebie price. How many freebie units a customer may add in total per order (across any freebie products) is set once in Settings > Store settings.')
+                ->schema([
+                    Forms\Components\Toggle::make('is_freebie')
+                        ->label('This product is a freebie')
+                        ->live(),
+                    Forms\Components\TextInput::make('freebie_price')
+                        ->label('Freebie price')
+                        ->numeric()->prefix('₹')->minValue(0)->default(1)
+                        ->visible(fn (Forms\Get $get) => $get('is_freebie'))
+                        ->required(fn (Forms\Get $get) => $get('is_freebie')),
+                    Forms\Components\TextInput::make('freebie_min_order_value')
+                        ->label('Minimum order value')
+                        ->numeric()->prefix('₹')->minValue(0)->default(0)
+                        ->visible(fn (Forms\Get $get) => $get('is_freebie'))
+                        ->required(fn (Forms\Get $get) => $get('is_freebie'))
+                        ->helperText('Rest of the cart (excluding freebie products) must reach this.'),
+                ])->columns(3),
 
             Forms\Components\Section::make('Images')->schema([
                 Forms\Components\FileUpload::make('images')
@@ -110,23 +137,24 @@ class ProductResource extends Resource
                 Tables\Columns\TextColumn::make('item_code')->label('Item code')->searchable()->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('sku')->label('SKU')->searchable()->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('hsn_sac_code')->label('HSN/SAC')->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('brand')->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('brand.name')->label('Brand')->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('category.name')->badge()->sortable(),
                 Tables\Columns\TextColumn::make('category.tax_rate')->label('Tax')->suffix('%')->toggleable(),
-                Tables\Columns\TextColumn::make('mrp')->money('INR')->placeholder('—')->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('price')->label('Sales price')->money('INR')->sortable(),
-                Tables\Columns\TextColumn::make('discounted_price')->money('INR')->placeholder('—')->sortable(),
-                Tables\Columns\TextColumn::make('purchase_price')->money('INR')->placeholder('—')->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('price')->label('MRP')->money('INR')->sortable(),
+                Tables\Columns\TextColumn::make('discounted_price')->label('Selling price')->money('INR')->placeholder('—')->sortable(),
                 Tables\Columns\TextColumn::make('unit')->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('tags')->badge()->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('stock')->numeric()->sortable()
                     ->color(fn ($state) => $state > 0 ? 'success' : 'danger'),
                 Tables\Columns\TextColumn::make('sort_order')->numeric()->sortable()->toggleable(),
+                Tables\Columns\ToggleColumn::make('is_active')->label('Active'),
+                Tables\Columns\IconColumn::make('is_freebie')->label('Freebie')->boolean()->toggleable(),
                 Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable()->toggleable(isToggledHiddenByDefault: true),
             ])
             ->defaultSort('sort_order')
             ->filters([
                 Tables\Filters\SelectFilter::make('category')->relationship('category', 'name'),
+                Tables\Filters\TernaryFilter::make('is_active'),
                 Tables\Filters\TrashedFilter::make(),
             ])
             ->actions([
@@ -135,6 +163,19 @@ class ProductResource extends Resource
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\BulkAction::make('activate')
+                        ->label('Activate')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->action(fn (Collection $records) => $records->each->update(['is_active' => true]))
+                        ->deselectRecordsAfterCompletion(),
+                    Tables\Actions\BulkAction::make('deactivate')
+                        ->label('Deactivate')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->requiresConfirmation()
+                        ->action(fn (Collection $records) => $records->each->update(['is_active' => false]))
+                        ->deselectRecordsAfterCompletion(),
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);

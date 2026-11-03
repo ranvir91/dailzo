@@ -15,7 +15,7 @@ class ProductController extends Controller
 {
     public function index(): JsonResponse
     {
-        $products = Product::with('category')
+        $products = Product::active()->with(['category', 'brand'])
             ->orderBy('sort_order')
             ->orderByDesc('created_at')
             ->get();
@@ -25,7 +25,7 @@ class ProductController extends Controller
 
     public function show(string $id): JsonResponse
     {
-        $product = Product::with('category')->find($id);
+        $product = Product::active()->with(['category', 'brand'])->find($id);
 
         return ApiResponse::success(
             $product,
@@ -49,11 +49,10 @@ class ProductController extends Controller
             'sku' => $data['sku'] ?? null,
             'item_code' => $data['itemCode'] ?? null,
             'hsn_sac_code' => $data['hsnSacCode'] ?? null,
-            'brand' => $data['brand'] ?? null,
+            'brand_id' => $data['brandId'] ?? null,
             'unit' => $data['unit'] ?? null,
             'category_id' => $category->id,
             'price' => $data['price'],
-            'mrp' => $data['mrp'] ?? null,
             'discounted_price' => $data['discountedPrice'] ?? null,
             'purchase_price' => $data['purchasePrice'] ?? null,
             'part_no' => $data['partNo'] ?? null,
@@ -61,9 +60,12 @@ class ProductController extends Controller
             'stock' => $data['stock'],
             'images' => UploadPath::normalizeMany($data['images'] ?? []),
             'sort_order' => $data['sortOrder'] ?? 0,
+            'is_freebie' => $data['isFreebie'] ?? false,
+            'freebie_price' => $data['freebiePrice'] ?? 1,
+            'freebie_min_order_value' => $data['freebieMinOrderValue'] ?? 0,
         ]);
 
-        return ApiResponse::success($product->load('category'), 'Product created successfully');
+        return ApiResponse::success($product->load(['category', 'brand']), 'Product created successfully');
     }
 
     public function update(Request $request, string $id): JsonResponse
@@ -85,11 +87,13 @@ class ProductController extends Controller
             'sku' => 'sku',
             'itemCode' => 'item_code',
             'hsnSacCode' => 'hsn_sac_code',
-            'brand' => 'brand',
+            'brandId' => 'brand_id',
             'unit' => 'unit',
-            'mrp' => 'mrp',
             'purchasePrice' => 'purchase_price',
             'partNo' => 'part_no',
+            'isFreebie' => 'is_freebie',
+            'freebiePrice' => 'freebie_price',
+            'freebieMinOrderValue' => 'freebie_min_order_value',
         ];
         foreach ($passthrough as $requestKey => $column) {
             if (array_key_exists($requestKey, $data)) {
@@ -117,7 +121,7 @@ class ProductController extends Controller
 
         $product->save();
 
-        return ApiResponse::success($product->load('category'), 'Product updated successfully');
+        return ApiResponse::success($product->load(['category', 'brand']), 'Product updated successfully');
     }
 
     public function destroy(string $id): JsonResponse
@@ -148,12 +152,11 @@ class ProductController extends Controller
             ],
             'itemCode' => ['sometimes', 'nullable', 'string'],
             'hsnSacCode' => ['sometimes', 'nullable', 'string'],
-            'brand' => ['sometimes', 'nullable', 'string'],
+            'brandId' => ['sometimes', 'nullable', 'integer', 'exists:brands,id'],
             'unit' => ['sometimes', 'nullable', 'string'],
             'category' => ['sometimes', 'nullable', 'string'],
             'categoryId' => ['sometimes', 'nullable', 'integer'],
             'price' => [$creating ? 'required' : 'sometimes', 'numeric', 'min:0'],
-            'mrp' => ['sometimes', 'nullable'],
             'discountedPrice' => ['sometimes', 'nullable'],
             'purchasePrice' => ['sometimes', 'nullable'],
             'partNo' => ['sometimes', 'nullable', 'string'],
@@ -163,11 +166,14 @@ class ProductController extends Controller
             'images' => ['sometimes', 'array'],
             'images.*' => ['string'],
             'sortOrder' => ['sometimes', 'nullable'],
+            'isFreebie' => ['sometimes', 'boolean'],
+            'freebiePrice' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'freebieMinOrderValue' => ['sometimes', 'nullable', 'numeric', 'min:0'],
         ];
 
         $data = $request->validate($rules);
 
-        foreach (['discountedPrice', 'mrp', 'purchasePrice'] as $nullableNumber) {
+        foreach (['discountedPrice', 'purchasePrice'] as $nullableNumber) {
             if (array_key_exists($nullableNumber, $data)) {
                 $data[$nullableNumber] = ($data[$nullableNumber] === '' || $data[$nullableNumber] === null)
                     ? null

@@ -10,6 +10,10 @@ use Barryvdh\DomPDF\Facade\Pdf;
  * Builds the GST tax invoice for an order (modeled on the reference Blinkit
  * invoice layout) and renders it to a PDF.
  *
+ * order_items.mrp snapshots the product's MRP (products.price) at order
+ * time; order_items.price is what was actually charged (discounted_price
+ * when set, else the MRP) — their difference is the "Discount" column.
+ *
  * Tax split: every order_item carries its own frozen tax_rate (snapshotted
  * at order time — see OrderController::store), the combined GST rate for
  * that product's category. When the delivery address's state matches the
@@ -45,11 +49,22 @@ class InvoiceService
         $igstTotal = 0.0;
         $taxableTotal = 0.0;
 
+        // See config/tax.php — for these categories, tax is calculated on
+        // the MRP (order_items.mrp) rather than the discounted amount
+        // actually charged.
+        $specialTaxCategories = config('tax.special_tax_categories', []);
+
         foreach ($order->items as $item) {
             $qty = (int) $item->quantity;
             $taxRate = (float) $item->tax_rate;
-            $unitTaxable = (float) $item->base_price;
-            $unitTax = (float) $item->tax_amount;
+
+            if (in_array($item->product->category?->slug, $specialTaxCategories, true) && (float) $item->mrp > 0) {
+                [$unitTaxable, $unitTax] = $this->splitTax((float) $item->mrp, $taxRate);
+            } else {
+                $unitTaxable = (float) $item->base_price;
+                $unitTax = (float) $item->tax_amount;
+            }
+
             $lineTaxable = round($unitTaxable * $qty, 2);
             $lineTax = round($unitTax * $qty, 2);
             $lineTotal = round((float) $item->price * $qty, 2);
@@ -161,6 +176,18 @@ class InvoiceService
         $data = $this->buildData($order);
 
         return Pdf::loadView('invoices.order', $data)->setPaper('a4');
+    }
+
+    /** Reverse-splits a tax-inclusive amount into [base, tax] at the given GST rate. */
+    private function splitTax(float $amount, float $rate): array
+    {
+        if ($rate <= 0) {
+            return [round($amount, 2), 0.0];
+        }
+
+        $base = round($amount / (1 + $rate / 100), 2);
+
+        return [$base, round($amount - $base, 2)];
     }
 
     /** "₹1,260.00" -> "One Thousand Two Hundred And Sixty Rupees Only". Indian (lakh/crore) grouping. */

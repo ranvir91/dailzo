@@ -2,11 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class CatalogApiTest extends TestCase
@@ -56,6 +58,25 @@ class CatalogApiTest extends TestCase
         $this->getJson('/api/v1/products')->assertJsonCount(0, 'data');
     }
 
+    public function test_inactive_products_are_hidden_from_the_public_catalog(): void
+    {
+        $active = Product::factory()->create(['is_active' => true]);
+        $inactive = Product::factory()->create(['is_active' => false]);
+
+        $this->getJson('/api/v1/products')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $active->id);
+
+        $this->getJson("/api/v1/products/{$active->id}")
+            ->assertOk()
+            ->assertJsonPath('data.id', $active->id);
+
+        $this->getJson("/api/v1/products/{$inactive->id}")
+            ->assertOk()
+            ->assertJsonPath('data', null);
+    }
+
     public function test_category_status_toggle(): void
     {
         $category = Category::factory()->create(['is_active' => true]);
@@ -94,6 +115,7 @@ class CatalogApiTest extends TestCase
     public function test_creating_a_product_persists_the_new_billing_fields(): void
     {
         $category = Category::factory()->create();
+        $brand = Brand::factory()->create(['name' => 'Acme']);
 
         $payload = [
             'name' => 'Mobile Charger',
@@ -104,9 +126,8 @@ class CatalogApiTest extends TestCase
             'sku' => 'CHG-001',
             'itemCode' => 'IC-9',
             'hsnSacCode' => '8504',
-            'brand' => 'Acme',
+            'brandId' => $brand->id,
             'unit' => 'PCS',
-            'mrp' => 1500,
             'purchasePrice' => 900,
             'partNo' => 'PN-55',
         ];
@@ -119,9 +140,8 @@ class CatalogApiTest extends TestCase
             ->assertJsonPath('data.sku', 'CHG-001')
             ->assertJsonPath('data.itemCode', 'IC-9')
             ->assertJsonPath('data.hsnSacCode', '8504')
-            ->assertJsonPath('data.brand', 'Acme')
+            ->assertJsonPath('data.brand.name', 'Acme')
             ->assertJsonPath('data.unit', 'PCS')
-            ->assertJsonPath('data.mrp', '1500.00')
             ->assertJsonPath('data.purchasePrice', '900.00')
             ->assertJsonPath('data.partNo', 'PN-55');
 
@@ -173,6 +193,30 @@ class CatalogApiTest extends TestCase
             ->assertJsonPath('data.tags', ['Festive']);
 
         $this->assertSame(['Festive'], $product->fresh()->tags);
+    }
+
+    public function test_placing_an_order_sends_an_order_placed_sms(): void
+    {
+        config([
+            'sms.enabled' => true,
+            'sms.templates.order_placed.dlt_template_id' => 'dlt-order-placed',
+        ]);
+        Http::fake(['*' => Http::response('000', 200)]);
+
+        $category = Category::factory()->create(['tax_rate' => 0]);
+        $product = Product::factory()->create(['category_id' => $category->id, 'price' => 100]);
+        $user = User::factory()->create(['phone' => '9800000077']);
+
+        $this->actingAsUser($user)
+            ->postJson('/api/v1/orders', [
+                'paymentMethod' => 'COD',
+                'total' => 100,
+                'items' => [['productId' => $product->id, 'quantity' => 1]],
+            ])
+            ->assertOk();
+
+        Http::assertSent(fn ($request) => $request['number'] === '919800000077'
+            && str_contains($request['text'], 'has been placed successfully'));
     }
 
     public function test_order_item_snapshots_the_tax_rate_at_order_time(): void
