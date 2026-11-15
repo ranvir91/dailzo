@@ -15,7 +15,12 @@ class ProductController extends Controller
 {
     public function index(): JsonResponse
     {
-        $products = Product::active()->with(['category', 'brand'])
+        // Variant children (parent_id set — e.g. "Aata 10kg" under "Aata
+        // 5kg") are hidden from the main catalog listing: the app surfaces
+        // them as a pack-size picker on the parent's own detail page
+        // instead (see show() below), not as separate catalog entries.
+        $products = Product::active()->whereNull('parent_id')->with(['category', 'brand'])
+            ->withCount('variants')
             ->orderBy('sort_order')
             ->orderByDesc('created_at')
             ->get();
@@ -25,7 +30,9 @@ class ProductController extends Controller
 
     public function show(string $id): JsonResponse
     {
-        $product = Product::active()->with(['category', 'brand'])->find($id);
+        $product = Product::active()
+            ->with(['category', 'brand', 'variants.category', 'variants.brand'])
+            ->find($id);
 
         return ApiResponse::success(
             $product,
@@ -51,6 +58,8 @@ class ProductController extends Controller
             'hsn_sac_code' => $data['hsnSacCode'] ?? null,
             'brand_id' => $data['brandId'] ?? null,
             'unit' => $data['unit'] ?? null,
+            'parent_id' => $data['parentId'] ?? null,
+            'variant_label' => $data['variantLabel'] ?? null,
             'category_id' => $category->id,
             'price' => $data['price'],
             'discounted_price' => $data['discountedPrice'] ?? null,
@@ -89,6 +98,8 @@ class ProductController extends Controller
             'hsnSacCode' => 'hsn_sac_code',
             'brandId' => 'brand_id',
             'unit' => 'unit',
+            'parentId' => 'parent_id',
+            'variantLabel' => 'variant_label',
             'purchasePrice' => 'purchase_price',
             'partNo' => 'part_no',
             'isFreebie' => 'is_freebie',
@@ -154,6 +165,12 @@ class ProductController extends Controller
             'hsnSacCode' => ['sometimes', 'nullable', 'string'],
             'brandId' => ['sometimes', 'nullable', 'integer', 'exists:brands,id'],
             'unit' => ['sometimes', 'nullable', 'string'],
+            'parentId' => [
+                'sometimes', 'nullable', 'integer',
+                Rule::exists('products', 'id')->whereNull('parent_id'),
+                Rule::notIn([$ignoreId]),
+            ],
+            'variantLabel' => ['sometimes', 'nullable', 'string', 'max:255'],
             'category' => ['sometimes', 'nullable', 'string'],
             'categoryId' => ['sometimes', 'nullable', 'integer'],
             'price' => [$creating ? 'required' : 'sometimes', 'numeric', 'min:0'],
@@ -184,6 +201,11 @@ class ProductController extends Controller
             $data['sortOrder'] = ($data['sortOrder'] === '' || $data['sortOrder'] === null)
                 ? null
                 : (int) $data['sortOrder'];
+        }
+        if (array_key_exists('parentId', $data)) {
+            $data['parentId'] = ($data['parentId'] === '' || $data['parentId'] === null)
+                ? null
+                : (int) $data['parentId'];
         }
 
         return $data;

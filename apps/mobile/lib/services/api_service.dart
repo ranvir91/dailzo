@@ -240,6 +240,16 @@ class ApiService {
     return _stableSortBySortOrder(products, (p) => p.sortOrder);
   }
 
+  /// Fetches a single product by id. Unlike [fetchProducts] (the catalog
+  /// listing), this embeds its pack-size/weight variants — the listing
+  /// deliberately hides them (see ProductController::index()).
+  Future<Product?> fetchProduct(String id) async {
+    final json = await _request(method: 'GET', path: '/products/$id');
+    final data = json['data'];
+    if (data is! Map<String, dynamic>) return null;
+    return Product.fromJson(data);
+  }
+
   Future<Cart> fetchCart() async {
     final json = await _request(method: 'GET', path: '/cart');
     final data = json['data'];

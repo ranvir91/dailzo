@@ -83,7 +83,7 @@ class OrderResource extends Resource
                     ->height(48)
                     ->width(48)
                     ->circular(),
-                Infolists\Components\TextEntry::make('product.name')->label('Product')->placeholder('Deleted product'),
+                Infolists\Components\TextEntry::make('product.display_name')->label('Product')->placeholder('Deleted product'),
                 Infolists\Components\TextEntry::make('quantity'),
                 Infolists\Components\TextEntry::make('price')->label('Unit price')->money('INR'),
                 Infolists\Components\TextEntry::make('line_total')

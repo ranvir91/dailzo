@@ -89,7 +89,7 @@ class CartScreen extends StatelessWidget {
                       itemBuilder: (context, index) {
                         final item = cart.items[index];
                         final product = productsById[item.productId];
-                        final title = product?.name ?? item.productId;
+                        final title = product?.displayName ?? item.productId;
                         final unitPrice = effectivePrices[item.id] ?? 0.0;
                         final isFreebiePrice =
                             product != null && product.isFreebie && unitPrice == product.freebiePrice;

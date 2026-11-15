@@ -24,7 +24,13 @@ class Product {
     this.isFreebie = false,
     this.freebiePrice = 1,
     this.freebieMinOrderValue = 0,
-  });
+    this.variantLabel = '',
+    this.variants = const [],
+    this.hasVariants = false,
+    String? displayName,
+  }) : displayName = (displayName != null && displayName.isNotEmpty)
+            ? displayName
+            : (variantLabel.isNotEmpty ? '$name ($variantLabel)' : name);
 
   final String id;
   final String name;
@@ -63,6 +69,32 @@ class Product {
   final bool isFreebie;
   final double freebiePrice;
   final double freebieMinOrderValue;
+
+  /// Pack-size/weight label (e.g. "5kg", "200g") — set only on a product
+  /// that is itself someone else's variant. Empty for a standalone product
+  /// or for the "default" pack-size entry a customer first lands on.
+  final String variantLabel;
+
+  /// Other pack sizes of this product (e.g. Aata 5kg's 10kg/20kg siblings)
+  /// — each is a fully independent, orderable Product in its own right.
+  /// Only populated on the product the app fetched directly (see
+  /// ProductController::show()); a variant's own [variants] list is empty.
+  final List<Product> variants;
+
+  /// True when this product has other pack sizes — lets a quick "add" tap
+  /// on a catalog tile know to open the pack-size picker (product detail
+  /// page) instead of adding this exact row straight to the cart. Backed by
+  /// the listing's own `variants_count` (see Product::getHasVariantsAttribute
+  /// on the backend), not the (usually empty, on a tile) [variants] list.
+  final bool hasVariants;
+
+  /// "Aata 10kg (10kg)" — [name] with its pack size appended when set, so a
+  /// cart/order line can tell apart the same base product in different
+  /// pack sizes. Prefer this over [name] wherever a pack-size picker isn't
+  /// also shown right next to it (e.g. cart, order history/detail) — on the
+  /// product detail page itself, keep using [name] since the picker there
+  /// already shows the size separately.
+  final String displayName;
 
   bool hasTag(String tag) =>
       tags.any((t) => t.toLowerCase() == tag.toLowerCase());
@@ -151,6 +183,14 @@ class Product {
       freebiePrice: double.tryParse(json['freebiePrice']?.toString() ?? '') ?? 1,
       freebieMinOrderValue:
           double.tryParse(json['freebieMinOrderValue']?.toString() ?? '') ?? 0,
+      variantLabel: json['variantLabel']?.toString() ?? '',
+      variants: (json['variants'] as List?)
+              ?.whereType<Map<String, dynamic>>()
+              .map(Product.fromJson)
+              .toList() ??
+          const [],
+      hasVariants: json['hasVariants'] == true,
+      displayName: json['displayName']?.toString(),
     );
   }
 }

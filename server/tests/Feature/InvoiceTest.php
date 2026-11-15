@@ -119,6 +119,22 @@ class InvoiceTest extends TestCase
         $this->assertSame(1200.0, $line['total']);
     }
 
+    public function test_the_invoice_line_description_names_the_products_pack_size_variant(): void
+    {
+        $category = Category::factory()->create(['tax_rate' => 18]);
+        $parent = Product::factory()->create(['category_id' => $category->id, 'name' => 'Aata 5kg']);
+        $variant = Product::factory()->create([
+            'category_id' => $category->id, 'name' => 'Aata 10kg', 'price' => 580,
+            'parent_id' => $parent->id, 'variant_label' => '10kg',
+        ]);
+        $user = User::factory()->create();
+        $order = $this->placeOrder($user, $variant, ['total' => 580]);
+
+        $data = app(InvoiceService::class)->buildData($order);
+
+        $this->assertSame('Aata 10kg (10kg)', $data['lines'][0]['description']);
+    }
+
     public function test_special_tax_categories_are_taxed_on_mrp_not_the_discounted_price(): void
     {
         config(['tax.special_tax_categories' => ['tobacco']]);

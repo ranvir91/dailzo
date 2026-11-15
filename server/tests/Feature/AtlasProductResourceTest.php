@@ -203,4 +203,27 @@ class AtlasProductResourceTest extends TestCase
         $this->assertSame('1.00', (string) $product->freebie_price);
         $this->assertSame('500.00', (string) $product->freebie_min_order_value);
     }
+
+    public function test_a_product_can_be_linked_as_a_pack_size_variant_of_another(): void
+    {
+        $category = Category::factory()->create();
+        $parent = Product::factory()->create(['category_id' => $category->id, 'name' => 'Aata 5kg']);
+
+        Livewire::test(CreateProduct::class)
+            ->fillForm([
+                'name' => 'Aata 10kg',
+                'category_id' => $category->id,
+                'price' => 600,
+                'stock' => 10,
+                'parent_id' => $parent->id,
+                'variant_label' => '10kg',
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $variant = Product::where('name', 'Aata 10kg')->firstOrFail();
+        $this->assertSame($parent->id, $variant->parent_id);
+        $this->assertSame('10kg', $variant->variant_label);
+    }
+
 }
