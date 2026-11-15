@@ -2,12 +2,17 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Exports\CategoryExporter;
+use App\Filament\Imports\CategoryImporter;
 use App\Filament\Resources\CategoryResource\Pages;
 use App\Models\Category;
+use Filament\Actions\Exports\Enums\ExportFormat;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Actions\ExportBulkAction;
+use Filament\Tables\Actions\ImportAction;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -49,8 +54,13 @@ class CategoryResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->headerActions([
+                ImportAction::make()
+                    ->importer(CategoryImporter::class)
+                    ->label('Bulk import via CSV'),
+            ])
             ->columns([
-                Tables\Columns\ImageColumn::make('icon_url')->disk('web')->label('')->circular(),
+                Tables\Columns\ImageColumn::make('icon_url')->disk('web')->label('Images')->circular(),
                 Tables\Columns\TextColumn::make('name')->searchable()->sortable(),
                 Tables\Columns\TextColumn::make('slug')->color('gray')->toggleable(),
                 Tables\Columns\TextColumn::make('tax_rate')->label('Tax')->suffix('%')->sortable(),
@@ -69,6 +79,11 @@ class CategoryResource extends Resource
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
+                    ExportBulkAction::make()
+                        ->label('Export selected (CSV)')
+                        ->exporter(CategoryExporter::class)
+                        ->formats([ExportFormat::Csv])
+                        ->columnMapping(false),
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);

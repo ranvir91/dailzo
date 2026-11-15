@@ -78,6 +78,21 @@ class OrderLineItem {
 
   String get displayText => '$productName x$quantity';
 
+  /// Prefers the backend's own "name (pack size)" formatting (see
+  /// Product::getDisplayNameAttribute) so an order with the same product in
+  /// different pack sizes shows a distinct line for each; falls back to
+  /// building it client-side if an older API response lacks displayName.
+  static String _resolveProductName(Map<String, dynamic> product) {
+    final displayName = product['displayName']?.toString().trim() ?? '';
+    if (displayName.isNotEmpty) return displayName;
+
+    final name = product['name']?.toString().trim() ?? '';
+    final variantLabel = product['variantLabel']?.toString().trim() ?? '';
+    if (name.isEmpty) return '';
+
+    return variantLabel.isNotEmpty ? '$name ($variantLabel)' : name;
+  }
+
   static String _resolveImageUrl(dynamic product) {
     if (product is! Map<String, dynamic>) return '';
     final images = product['images'];
@@ -99,7 +114,7 @@ class OrderLineItem {
     final productId = json['productId']?.toString() ?? 'item';
     final product = json['product'];
     final productName = product is Map<String, dynamic>
-        ? (product['name']?.toString().trim() ?? '')
+        ? _resolveProductName(product)
         : '';
     return OrderLineItem(
       productId: productId,

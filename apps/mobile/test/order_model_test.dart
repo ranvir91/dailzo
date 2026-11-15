@@ -42,4 +42,37 @@ void main() {
       expect(item.imageUrl, isEmpty);
     });
   });
+
+  group('OrderLineItem.fromJson product name resolution', () {
+    test('prefers the backends own displayName when present', () {
+      final item = OrderLineItem.fromJson({
+        'productId': 'p1',
+        'quantity': 2,
+        'product': {'name': 'Aata 10kg', 'variantLabel': '10kg', 'displayName': 'Aata 10kg (10kg)'},
+      });
+
+      expect(item.productName, 'Aata 10kg (10kg)');
+      expect(item.displayText, 'Aata 10kg (10kg) x2');
+    });
+
+    test('falls back to building "name (variantLabel)" when displayName is absent', () {
+      final item = OrderLineItem.fromJson({
+        'productId': 'p1',
+        'quantity': 1,
+        'product': {'name': 'Aata 10kg', 'variantLabel': '10kg'},
+      });
+
+      expect(item.productName, 'Aata 10kg (10kg)');
+    });
+
+    test('is just the plain name for a standalone product with no variant label', () {
+      final item = OrderLineItem.fromJson({
+        'productId': 'p1',
+        'quantity': 1,
+        'product': {'name': 'Bread'},
+      });
+
+      expect(item.productName, 'Bread');
+    });
+  });
 }

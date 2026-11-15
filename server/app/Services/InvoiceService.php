@@ -82,7 +82,7 @@ class InvoiceService
             $lines[] = [
                 'sr' => $sr++,
                 'code' => $item->product->sku ?: $item->product->item_code ?: (string) $item->product_id,
-                'description' => $item->product->name
+                'description' => $item->product->display_name
                     .($item->product->hsn_sac_code ? " (HSN {$item->product->hsn_sac_code})" : ''),
                 'mrp' => $lineMrp > 0 ? $lineMrp : null,
                 'discount' => $lineDiscount > 0 ? $lineDiscount : null,

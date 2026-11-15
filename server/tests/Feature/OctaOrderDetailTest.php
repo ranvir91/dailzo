@@ -56,6 +56,28 @@ class OctaOrderDetailTest extends TestCase
             ->assertSee('rice.png', escape: false);
     }
 
+    public function test_the_order_detail_page_names_the_products_pack_size_variant(): void
+    {
+        $vendor = Vendor::factory()->create();
+        $parent = Product::factory()->create(['name' => 'Aata 5kg']);
+        $variant = Product::factory()->create([
+            'name' => 'Aata 10kg', 'parent_id' => $parent->id, 'variant_label' => '10kg',
+        ]);
+        $order = Order::factory()->create(['vendor_id' => $vendor->id]);
+        OrderItem::create([
+            'order_id' => $order->id,
+            'product_id' => $variant->id,
+            'quantity' => 1,
+            'price' => 580,
+        ]);
+
+        $this->actingAs($vendor->user);
+
+        Livewire::test(ViewOrder::class, ['record' => $order->getRouteKey()])
+            ->assertOk()
+            ->assertSee('Aata 10kg (10kg)');
+    }
+
     public function test_the_order_detail_page_renders_without_a_coupon_or_address(): void
     {
         $vendor = Vendor::factory()->create();

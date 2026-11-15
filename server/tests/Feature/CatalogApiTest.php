@@ -77,6 +77,68 @@ class CatalogApiTest extends TestCase
             ->assertJsonPath('data', null);
     }
 
+    public function test_pack_size_variants_are_hidden_from_the_listing_but_embedded_in_their_parents_show(): void
+    {
+        $category = Category::factory()->create();
+        $parent = Product::factory()->create([
+            'category_id' => $category->id, 'name' => 'Aata 5kg', 'price' => 300,
+        ]);
+        $variant = Product::factory()->create([
+            'category_id' => $category->id, 'name' => 'Aata 10kg', 'price' => 580,
+            'parent_id' => $parent->id, 'variant_label' => '10kg',
+        ]);
+
+        $listing = $this->getJson('/api/v1/products')->assertOk()->json('data');
+        $this->assertCount(1, $listing);
+        $this->assertSame($parent->id, $listing[0]['id']);
+        $this->assertTrue($listing[0]['hasVariants']);
+
+        $this->getJson("/api/v1/products/{$parent->id}")
+            ->assertOk()
+            ->assertJsonPath('data.hasVariants', true)
+            ->assertJsonPath('data.variants.0.id', $variant->id)
+            ->assertJsonPath('data.variants.0.variantLabel', '10kg')
+            ->assertJsonPath('data.variants.0.price', '580.00');
+    }
+
+    public function test_a_standalone_product_reports_no_variants_in_the_listing(): void
+    {
+        $product = Product::factory()->create();
+
+        $this->getJson('/api/v1/products')
+            ->assertOk()
+            ->assertJsonPath('data.0.hasVariants', false);
+    }
+
+    public function test_creating_a_product_as_a_pack_size_variant_requires_the_parent_to_be_standalone(): void
+    {
+        $category = Category::factory()->create();
+        $grandparent = Product::factory()->create(['category_id' => $category->id]);
+        $existingVariant = Product::factory()->create([
+            'category_id' => $category->id, 'parent_id' => $grandparent->id,
+        ]);
+
+        $this->actingAsUser(User::factory()->admin()->create())
+            ->postJson('/api/v1/products', [
+                'name' => 'Another Variant',
+                'price' => 100,
+                'stock' => 5,
+                'categoryId' => $category->id,
+                'parentId' => $existingVariant->id,
+            ])
+            ->assertStatus(422);
+    }
+
+    public function test_a_product_cannot_be_its_own_parent_variant(): void
+    {
+        $category = Category::factory()->create();
+        $product = Product::factory()->create(['category_id' => $category->id]);
+
+        $this->actingAsUser(User::factory()->admin()->create())
+            ->patchJson("/api/v1/products/{$product->id}", ['parentId' => $product->id])
+            ->assertStatus(422);
+    }
+
     public function test_category_status_toggle(): void
     {
         $category = Category::factory()->create(['is_active' => true]);

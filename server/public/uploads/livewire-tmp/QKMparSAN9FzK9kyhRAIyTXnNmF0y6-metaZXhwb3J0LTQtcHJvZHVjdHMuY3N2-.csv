@@ -1,0 +1,5 @@
+﻿id,sku,name,price,discounted_price,stock,is_active,unit,variant_label,category,brand
+1,,Fresh Milk,60,54,40,1,,1L,dairy,
+4,,Butter Croissant,55,,15,1,,,bakery,
+5,,Basmati Rice 10k,1000,900,20,1,KG,10Kg,groceries,ITC
+,,Fresh Milk,120,106,40,1,,2L,dairy,

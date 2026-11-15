@@ -46,4 +46,59 @@ void main() {
     expect(find.text('Price breakdown'), findsNothing);
     expect(find.text('Base price'), findsNothing);
   });
+
+  testWidgets(
+      'shows a pack-size picker when the product has variants and switches price on tap',
+      (tester) async {
+    final variant = Product(
+      id: '2',
+      name: 'Aata 10kg',
+      description: '',
+      sku: 'AATA-10',
+      price: 580,
+      discountedPrice: 580,
+      stock: 5,
+      reserved: 0,
+      categoryId: '3',
+      category: 'Staples',
+      imageUrls: const [],
+      variantLabel: '10kg',
+    );
+    final parent = Product(
+      id: '1',
+      name: 'Aata 5kg',
+      description: '',
+      sku: 'AATA-5',
+      price: 300,
+      discountedPrice: 300,
+      stock: 10,
+      reserved: 0,
+      categoryId: '3',
+      category: 'Staples',
+      imageUrls: const [],
+      variants: [variant],
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: ProductDetailScreen(
+        product: parent,
+        allProducts: [parent],
+        onAddToCart: (_) async {},
+        onOpenProduct: (_) async {},
+        onGoToCart: () async {},
+        cartItemCount: 0,
+      ),
+    ));
+
+    expect(find.text('Pack size'), findsOneWidget);
+    expect(find.text('Standard'), findsOneWidget);
+    expect(find.text('10kg'), findsOneWidget);
+    expect(find.text('₹300'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(ChoiceChip, '10kg'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('₹580'), findsOneWidget);
+    expect(find.text('Aata 10kg'), findsWidgets);
+  });
 }

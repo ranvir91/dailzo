@@ -29,11 +29,24 @@ class ProductDetailScreen extends StatefulWidget {
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   late int _cartItemCount;
+  late Product _selected;
+  late List<Product> _packSizes;
 
   @override
   void initState() {
     super.initState();
     _cartItemCount = widget.cartItemCount;
+    _selected = widget.product;
+    // The product the app fetched directly embeds its own pack-size
+    // siblings in `variants` (see ProductController::show()); a variant
+    // itself has an empty `variants` list, so this only ever runs once.
+    _packSizes = [widget.product, ...widget.product.variants];
+  }
+
+  String _packSizeLabel(Product product) {
+    if (product.variantLabel.isNotEmpty) return product.variantLabel;
+    if (product.unit.isNotEmpty) return product.unit;
+    return 'Standard';
   }
 
   Future<void> _handleAddToCart(Product product) async {
@@ -49,25 +62,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final similarProducts = widget.allProducts
         .where((item) =>
             item.categoryId == widget.product.categoryId &&
-            item.id != widget.product.id)
+            item.id != widget.product.id &&
+            !_packSizes.any((size) => size.id == item.id))
         .take(6)
         .toList();
 
     final canGoToCart = _cartItemCount > 0;
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.product.name)),
+      appBar: AppBar(title: Text(_selected.name)),
       body: ListView(
         padding: const EdgeInsets.all(14),
         children: [
           ProductImageCarousel(
-            imageUrls: widget.product.imageUrls,
+            imageUrls: _selected.imageUrls,
             height: 260,
             borderRadius: 14,
           ),
           const SizedBox(height: 12),
           Text(
-            widget.product.name,
+            _selected.name,
             style: Theme.of(context)
                 .textTheme
                 .titleLarge
@@ -80,22 +94,45 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               const SizedBox(width: 4),
               const Text('4.5', style: TextStyle(fontWeight: FontWeight.w700)),
               const SizedBox(width: 12),
-              Text(widget.product.category,
+              Text(_selected.category,
                   style: TextStyle(color: Colors.grey.shade700)),
             ],
           ),
+          if (_packSizes.length > 1) ...[
+            const SizedBox(height: 12),
+            Text(
+              'Pack size',
+              style: Theme.of(context)
+                  .textTheme
+                  .labelLarge
+                  ?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _packSizes.map((size) {
+                final isSelected = size.id == _selected.id;
+                return ChoiceChip(
+                  label: Text(_packSizeLabel(size)),
+                  selected: isSelected,
+                  onSelected: (_) => setState(() => _selected = size),
+                );
+              }).toList(),
+            ),
+          ],
           const SizedBox(height: 10),
           Row(
             children: [
               Text(
-                '₹${widget.product.currentPrice.toStringAsFixed(0)}',
+                '₹${_selected.currentPrice.toStringAsFixed(0)}',
                 style:
                     const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
               ),
-              if (widget.product.discountPercent > 0) ...[
+              if (_selected.discountPercent > 0) ...[
                 const SizedBox(width: 10),
                 Text(
-                  'MRP ₹${widget.product.originalPrice.toStringAsFixed(0)}',
+                  'MRP ₹${_selected.originalPrice.toStringAsFixed(0)}',
                   style: TextStyle(
                     color: Colors.grey.shade700,
                     decoration: TextDecoration.lineThrough,
@@ -111,7 +148,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    '${widget.product.discountPercent}% OFF',
+                    '${_selected.discountPercent}% OFF',
                     style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w700,
@@ -121,14 +158,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ],
             ],
           ),
-          if (widget.product.unit.isNotEmpty) ...[
+          if (_selected.unit.isNotEmpty) ...[
             const SizedBox(height: 4),
-            Text(widget.product.unit,
+            Text(_selected.unit,
                 style: TextStyle(color: Colors.grey.shade700, fontSize: 13)),
           ],
           const SizedBox(height: 10),
-          Text(widget.product.description.isNotEmpty
-              ? widget.product.description
+          Text(_selected.description.isNotEmpty
+              ? _selected.description
               : 'Everyday essentials, delivered on demand.'),
           const SizedBox(height: 10),
           Card(
@@ -137,13 +174,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (widget.product.sku.isNotEmpty)
-                    Text('SKU: ${widget.product.sku}'),
-                  if (widget.product.brand.isNotEmpty)
-                    Text('Brand: ${widget.product.brand}'),
-                  if (widget.product.hsnSacCode.isNotEmpty)
-                    Text('HSN/SAC: ${widget.product.hsnSacCode}'),
-                  Text('Category: ${widget.product.category}'),
+                  if (_selected.sku.isNotEmpty)
+                    Text('SKU: ${_selected.sku}'),
+                  if (_selected.brand.isNotEmpty)
+                    Text('Brand: ${_selected.brand}'),
+                  if (_selected.hsnSacCode.isNotEmpty)
+                    Text('HSN/SAC: ${_selected.hsnSacCode}'),
+                  Text('Category: ${_selected.category}'),
                 ],
               ),
             ),
@@ -157,12 +194,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   child: ElevatedButton(
                     onPressed: widget.isServiceable
                         ? () async {
-                            await _handleAddToCart(widget.product);
+                            await _handleAddToCart(_selected);
                             if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content:
-                                    Text('${widget.product.name} added to cart'),
+                                    Text('${_selected.name} added to cart'),
                                 backgroundColor:
                                     Theme.of(context).colorScheme.primary,
                               ),

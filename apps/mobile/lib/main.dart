@@ -110,6 +110,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<Category> _categories = const [];
   List<Product> _products = const [];
+  // The catalog listing (_products) excludes pack-size/weight variants (see
+  // ProductController::index()), but a cart item can point at one — this
+  // caches whichever variant products have been looked up individually (via
+  // opening their parent, or _resolveMissingCartProducts below) so the cart
+  // screen can still show their name/price instead of falling back to a
+  // raw id. See also _productMap().
+  final Map<String, Product> _variantProductsById = {};
   Cart _cart = Cart(id: '', items: const []);
   List<Address> _addresses = const [];
   List<Coupon> _coupons = const [];
@@ -247,6 +254,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       });
       _checkFreebieUnlocks();
+      await _resolveMissingCartProducts();
     } catch (error) {
       if (!mounted) return;
       setState(() => _error = error.toString());
@@ -306,6 +314,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
     setState(() => _cart = cart);
     _checkFreebieUnlocks();
+    await _resolveMissingCartProducts();
   }
 
   Future<void> _refreshOrders() async {
@@ -364,6 +373,18 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// A catalog tile's quick "add" tap. A tile has no way to say which pack
+  /// size the customer wants, so if the product has others (see
+  /// [Product.hasVariants]) this opens its detail page's picker instead of
+  /// guessing — otherwise it adds this exact product straight away.
+  Future<void> _addToCartOrPickPackSize(Product product) async {
+    if (product.hasVariants) {
+      await _openProduct(product);
+      return;
+    }
+    await _addToCart(product);
+  }
+
   Future<void> _removeCartItem(String itemId) async {
     await ApiService.instance.removeCartItem(itemId);
     await _refreshCart();
@@ -394,8 +415,33 @@ class _HomeScreenState extends State<HomeScreen> {
     }).toList();
   }
 
-  Map<String, Product> _productMap() =>
-      {for (final product in _products) product.id: product};
+  Map<String, Product> _productMap() => {
+        for (final product in _variantProductsById.values) product.id: product,
+        for (final product in _products) product.id: product,
+      };
+
+  /// Fetches full details for any cart item whose product isn't in the
+  /// catalog listing — i.e. a pack-size/weight variant (see _products'
+  /// doc comment above) — so the cart screen can show its real name/price
+  /// instead of falling back to a raw id with ₹0.
+  Future<void> _resolveMissingCartProducts() async {
+    final knownIds = _productMap().keys.toSet();
+    final missingIds = _cart.items
+        .map((item) => item.productId)
+        .where((id) => id.isNotEmpty && !knownIds.contains(id))
+        .toSet();
+    if (missingIds.isEmpty) return;
+
+    final fetched = await Future.wait(
+      missingIds.map((id) => ApiService.instance.fetchProduct(id)),
+    );
+    if (!mounted) return;
+    setState(() {
+      for (final product in fetched) {
+        if (product != null) _variantProductsById[product.id] = product;
+      }
+    });
+  }
 
   int get _cartItemCount =>
       _cart.items.fold<int>(0, (sum, item) => sum + item.quantity);
@@ -421,10 +467,24 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _openProduct(Product product) async {
     final isServiceable = ApiService.instance
         .isPincodeServiceable(_selectedPincode, _serviceablePincodes);
+    // The catalog listing hides pack-size/weight variants and doesn't embed
+    // them — only the single-product endpoint does (see
+    // ProductController::show()) — so re-fetch before opening the detail
+    // screen. Falls back to the list's copy if the product can't be
+    // refetched (e.g. offline).
+    final detailed = await ApiService.instance.fetchProduct(product.id);
+    if (!mounted) return;
+    if (detailed != null && detailed.variants.isNotEmpty) {
+      setState(() {
+        for (final variant in detailed.variants) {
+          _variantProductsById[variant.id] = variant;
+        }
+      });
+    }
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ProductDetailScreen(
-          product: product,
+          product: detailed ?? product,
           allProducts: _products,
           onAddToCart: _addToCart,
           onOpenProduct: _openProduct,
@@ -446,7 +506,7 @@ class _HomeScreenState extends State<HomeScreen> {
           tag: offer.tag,
           title: offer.title,
           allProducts: _products,
-          onAddToCart: _addToCart,
+          onAddToCart: _addToCartOrPickPackSize,
           onOpenProduct: _openProduct,
           isServiceable: isServiceable,
         ),
@@ -940,7 +1000,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 return ProductTile(
                   product: product,
                   onTap: () async => _openProduct(product),
-                  onAddToCart: () async => _addToCart(product),
+                  onAddToCart: () async => _addToCartOrPickPackSize(product),
                   isServiceable: isServiceable,
                 );
               },

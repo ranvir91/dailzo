@@ -37,6 +37,8 @@ class Product extends Model
         'hsn_sac_code',
         'brand_id',
         'unit',
+        'parent_id',
+        'variant_label',
         'category_id',
         'price',
         'discounted_price',
@@ -61,7 +63,7 @@ class Product extends Model
      * loaded (ProductController's index/show already do) or each one
      * triggers its own query.
      */
-    protected $appends = ['tax_rate', 'base_price', 'tax_amount'];
+    protected $appends = ['tax_rate', 'base_price', 'tax_amount', 'has_variants', 'display_name'];
 
     protected function casts(): array
     {
@@ -136,5 +138,47 @@ class Product extends Model
     public function cartItems()
     {
         return $this->hasMany(CartItem::class);
+    }
+
+    /** The product this is a pack-size/weight variant of (e.g. "Aata 10kg" -> parent "Aata 5kg"), if any. */
+    public function parent()
+    {
+        return $this->belongsTo(Product::class, 'parent_id');
+    }
+
+    /** Other pack-size/weight variants of this product — each is a fully independent, orderable Product row. */
+    public function variants()
+    {
+        return $this->hasMany(Product::class, 'parent_id');
+    }
+
+    /**
+     * "Aata 10kg (10kg)" — the single place that appends a product's pack
+     * size to its name, so order items/invoices/cart lines can tell apart
+     * the same base product ordered in different pack sizes, without each
+     * caller re-implementing the same string concat.
+     */
+    public function getDisplayNameAttribute(): string
+    {
+        return $this->variant_label ? "{$this->name} ({$this->variant_label})" : $this->name;
+    }
+
+    /**
+     * Lets the catalog listing (which doesn't embed `variants`, see
+     * ProductController::index()) tell a tile whether tapping "add" should
+     * jump to the pack-size picker instead of adding directly — without an
+     * extra request per product. Reads the `variants_count` the listing
+     * eager-loads via withCount('variants') when present, falling back to
+     * a query only when it isn't (e.g. a single show()/store() response).
+     */
+    public function getHasVariantsAttribute(): bool
+    {
+        if (array_key_exists('variants_count', $this->attributes)) {
+            return (int) $this->attributes['variants_count'] > 0;
+        }
+
+        return $this->relationLoaded('variants')
+            ? $this->variants->isNotEmpty()
+            : $this->variants()->exists();
     }
 }

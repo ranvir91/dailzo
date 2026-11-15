@@ -1,0 +1,4 @@
+﻿id,slug,name,tax_rate,is_active,sort_order
+1,dairy,Dairy 1,0,1,1
+2,bakery,Bakery,5,0,2
+4,electronics,Electronics,18,1,3
