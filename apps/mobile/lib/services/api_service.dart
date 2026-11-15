@@ -71,12 +71,14 @@ class ApiService {
       ({
         bool minOrderValueEnabled,
         double minOrderValue,
-        double deliveryCharges
+        double deliveryCharges,
+        int maxFreebieQuantityPerOrder,
       })> fetchStoreSettings() async {
     const fallback = (
       minOrderValueEnabled: false,
       minOrderValue: 0.0,
       deliveryCharges: 0.0,
+      maxFreebieQuantityPerOrder: 1,
     );
     try {
       final json = await _request(method: 'GET', path: '/settings/store');
@@ -89,6 +91,9 @@ class ApiService {
           deliveryCharges: double.tryParse(
                   data['deliveryCharges']?.toString() ?? '0') ??
               0,
+          maxFreebieQuantityPerOrder: int.tryParse(
+                  data['maxFreebieQuantityPerOrder']?.toString() ?? '1') ??
+              1,
         );
       }
       return fallback;

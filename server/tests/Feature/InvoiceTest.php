@@ -31,11 +31,13 @@ class InvoiceTest extends TestCase
             'pincode' => '121002',
         ]);
 
+        $chargedPrice = (float) ($product->discounted_price ?? $product->price);
+
         $order = Order::create(array_merge([
             'user_id' => $user->id,
             'status' => 'PENDING',
             'payment_method' => 'COD',
-            'total' => (float) $product->price,
+            'total' => $chargedPrice,
             'discount_amount' => 0,
             'delivery_charges' => 0,
             'address_id' => $address->id,
@@ -44,9 +46,10 @@ class InvoiceTest extends TestCase
         $order->items()->create([
             'product_id' => $product->id,
             'quantity' => 1,
-            'price' => $product->price,
+            'price' => $chargedPrice,
             'tax_rate' => $product->category->tax_rate,
-            'mrp' => $product->mrp ?? 0,
+            // MRP snapshot — see OrderController::store.
+            'mrp' => $product->price,
         ]);
 
         return $order->fresh();
@@ -55,7 +58,7 @@ class InvoiceTest extends TestCase
     public function test_customer_can_download_their_own_order_invoice(): void
     {
         $category = Category::factory()->create(['tax_rate' => 18]);
-        $product = Product::factory()->create(['category_id' => $category->id, 'price' => 1200, 'mrp' => 1500]);
+        $product = Product::factory()->create(['category_id' => $category->id, 'price' => 1200]);
         $user = User::factory()->create();
         $order = $this->placeOrder($user, $product, ['total' => 1200]);
 
@@ -100,7 +103,7 @@ class InvoiceTest extends TestCase
         StoreSetting::current()->update(['business_state' => 'Haryana']);
 
         $category = Category::factory()->create(['tax_rate' => 18]);
-        $product = Product::factory()->create(['category_id' => $category->id, 'price' => 1200, 'mrp' => 1500]);
+        $product = Product::factory()->create(['category_id' => $category->id, 'price' => 1500, 'discounted_price' => 1200]);
         $user = User::factory()->create();
         $order = $this->placeOrder($user, $product, ['total' => 1200]);
 
@@ -113,6 +116,46 @@ class InvoiceTest extends TestCase
         $this->assertSame(91.52, $line['sgst']);
         $this->assertSame(0.0, $line['igst']);
         $this->assertSame(300.0, $line['discount']);
+        $this->assertSame(1200.0, $line['total']);
+    }
+
+    public function test_special_tax_categories_are_taxed_on_mrp_not_the_discounted_price(): void
+    {
+        config(['tax.special_tax_categories' => ['tobacco']]);
+        StoreSetting::current()->update(['business_state' => 'Haryana']);
+
+        $category = Category::factory()->create(['slug' => 'tobacco', 'tax_rate' => 28]);
+        $product = Product::factory()->create(['category_id' => $category->id, 'price' => 1500, 'discounted_price' => 1200]);
+        $user = User::factory()->create();
+        $order = $this->placeOrder($user, $product, ['total' => 1200]);
+
+        $data = app(InvoiceService::class)->buildData($order);
+
+        $line = $data['lines'][0];
+        // Taxable value/CGST/SGST computed against the MRP (1500), not the
+        // discounted charged amount (1200) — see config/tax.php.
+        $this->assertSame(1171.88, $line['taxableValue']);
+        $this->assertSame(164.06, $line['cgst']);
+        $this->assertSame(164.06, $line['sgst']);
+        // The customer is still only charged the discounted amount.
+        $this->assertSame(1200.0, $line['total']);
+    }
+
+    public function test_a_category_not_in_the_special_tax_list_is_taxed_normally(): void
+    {
+        config(['tax.special_tax_categories' => ['tobacco']]);
+        StoreSetting::current()->update(['business_state' => 'Haryana']);
+
+        $category = Category::factory()->create(['slug' => 'groceries', 'tax_rate' => 28]);
+        $product = Product::factory()->create(['category_id' => $category->id, 'price' => 1500, 'discounted_price' => 1200]);
+        $user = User::factory()->create();
+        $order = $this->placeOrder($user, $product, ['total' => 1200]);
+
+        $data = app(InvoiceService::class)->buildData($order);
+
+        $line = $data['lines'][0];
+        // Normal lines are taxed on the discounted/charged amount (1200).
+        $this->assertNotSame(1171.88, $line['taxableValue']);
         $this->assertSame(1200.0, $line['total']);
     }
 
@@ -198,5 +241,18 @@ class InvoiceTest extends TestCase
         $this->assertSame('Dailzo Quick Commerce Pvt Ltd', $settings->business_name);
         $this->assertSame('06AAAAA0000A1Z5', $settings->gstin);
         $this->assertSame('Haryana', $settings->business_state);
+    }
+
+    public function test_admin_can_set_the_max_freebie_quantity_per_order(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->actingAs(User::factory()->admin()->create());
+
+        Livewire::test(ManageStoreSettings::class)
+            ->fillForm(['max_freebie_quantity_per_order' => 3])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame(3, StoreSetting::current()->fresh()->max_freebie_quantity_per_order);
     }
 }

@@ -3,8 +3,7 @@
 return [
 
     // While true, /auth/send-otp returns the generated OTP in the response body
-    // (no SMS gateway is wired yet). Matches the old NestJS backend's dev behaviour.
-    'otp_debug' => (bool) env('OTP_DEBUG', false),
+   'otp_debug' => (bool) env('OTP_DEBUG', false),
 
     // How long a generated OTP stays valid, in seconds.
     'otp_ttl' => (int) env('OTP_TTL_SECONDS', 300),
@@ -16,8 +15,6 @@ return [
     'upload_max_kb' => (int) env('UPLOAD_MAX_KB', 8192),
 
     // Admin account created by DatabaseSeeder. Set these in the environment
-    // before the first seed in production. (Read via config, not env() directly,
-    // so it still works when the config is cached.)
     'seed_admin_email' => env('SEED_ADMIN_EMAIL', 'admin@dailzo.app'),
     'seed_admin_password' => env('SEED_ADMIN_PASSWORD', 'password'),
 

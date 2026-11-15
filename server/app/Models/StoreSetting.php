@@ -15,6 +15,7 @@ class StoreSetting extends Model
         'tax' => 5,
         'min_order_value' => 0,
         'min_order_value_enabled' => false,
+        'max_freebie_quantity_per_order' => 1,
         'maintenance_mode' => false,
         'app_version' => '1.0.0',
         'store_open_time' => '09:00',
@@ -27,6 +28,7 @@ class StoreSetting extends Model
         'tax',
         'min_order_value',
         'min_order_value_enabled',
+        'max_freebie_quantity_per_order',
         'maintenance_mode',
         'app_version',
         'store_open_time',
@@ -49,6 +51,7 @@ class StoreSetting extends Model
             'tax' => 'decimal:2',
             'min_order_value' => 'decimal:2',
             'min_order_value_enabled' => 'boolean',
+            'max_freebie_quantity_per_order' => 'integer',
             'maintenance_mode' => 'boolean',
             'payment_methods' => 'array',
         ];

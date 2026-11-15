@@ -60,4 +60,26 @@ class AtlasOfferResourceTest extends TestCase
         $offer = Offer::where('title', 'Always On')->firstOrFail();
         $this->assertNull($offer->expires_at);
     }
+
+    public function test_an_offer_can_be_linked_to_a_product_tag(): void
+    {
+        Livewire::test(CreateOffer::class)
+            ->fillForm(['title' => 'Buy One Get One', 'tag' => 'BOGO'])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $offer = Offer::where('title', 'Buy One Get One')->firstOrFail();
+        $this->assertSame('BOGO', $offer->tag);
+    }
+
+    public function test_an_offer_without_a_tag_links_nowhere(): void
+    {
+        Livewire::test(CreateOffer::class)
+            ->fillForm(['title' => 'Plain Banner'])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $offer = Offer::where('title', 'Plain Banner')->firstOrFail();
+        $this->assertNull($offer->tag);
+    }
 }

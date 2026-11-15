@@ -39,6 +39,9 @@ class OfferResource extends Resource
             Forms\Components\Section::make()->schema([
                 Forms\Components\TextInput::make('title')->required()->maxLength(255),
                 Forms\Components\Textarea::make('description')->rows(2)->columnSpanFull(),
+                Forms\Components\TextInput::make('tag')
+                    ->helperText('Tapping this offer\'s banner in the app opens every product tagged with this exact value (Catalog > Products > Tags, case-insensitive) — e.g. "BOGO". Leave blank for a banner that doesn\'t link anywhere.')
+                    ->columnSpanFull(),
                 Forms\Components\FileUpload::make('image')
                     ->label('Banner image')
                     ->image()
@@ -80,6 +83,7 @@ class OfferResource extends Resource
             ->columns([
                 Tables\Columns\ImageColumn::make('image')->disk('web')->label(''),
                 Tables\Columns\TextColumn::make('title')->searchable()->weight('bold'),
+                Tables\Columns\TextColumn::make('tag')->badge()->placeholder('—')->toggleable(),
                 Tables\Columns\TextColumn::make('starts_at')->date()->label('Starts')
                     ->placeholder('Immediately')->sortable(),
                 Tables\Columns\TextColumn::make('expires_at')->date()->label('Expires')

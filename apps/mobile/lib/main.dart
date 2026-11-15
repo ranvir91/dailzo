@@ -19,7 +19,10 @@ import 'screens/order_detail_screen.dart';
 import 'screens/orders_screen.dart';
 import 'screens/product_detail_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/tagged_products_screen.dart';
 import 'services/api_service.dart';
+import 'services/freebie_pricing.dart';
+import 'widgets/freebie_unlocked_sheet.dart';
 import 'widgets/product_tile.dart';
 
 void main() {
@@ -111,12 +114,19 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Address> _addresses = const [];
   List<Coupon> _coupons = const [];
   List<Offer> _offers = const [];
+  // Tracks which freebie products have already been offered via the
+  // "unlocked" sheet for the current threshold crossing, so it doesn't
+  // re-pop on every cart refresh — cleared for a product once its own
+  // threshold is no longer met, so crossing it again later re-triggers it.
+  final Set<String> _freebieSheetShownForProductIds = {};
+  bool _freebieSheetOpen = false;
   List<Order> _orders = const [];
   List<ServiceablePincode> _serviceablePincodes = const [];
   UserProfile? _profile;
   bool _minOrderValueEnabled = false;
   double _minOrderValue = 0;
   double _deliveryCharges = 0;
+  int _maxFreebieQuantityPerOrder = 1;
 
   @override
   void initState() {
@@ -215,7 +225,8 @@ class _HomeScreenState extends State<HomeScreen> {
       final storeSettings = results[8] as ({
         bool minOrderValueEnabled,
         double minOrderValue,
-        double deliveryCharges
+        double deliveryCharges,
+        int maxFreebieQuantityPerOrder,
       });
       setState(() {
         _categories = results[0] as List<Category>;
@@ -230,10 +241,12 @@ class _HomeScreenState extends State<HomeScreen> {
         _minOrderValueEnabled = storeSettings.minOrderValueEnabled;
         _minOrderValue = storeSettings.minOrderValue;
         _deliveryCharges = storeSettings.deliveryCharges;
+        _maxFreebieQuantityPerOrder = storeSettings.maxFreebieQuantityPerOrder;
         if (_selectedPincode.isEmpty && pincodes.isNotEmpty) {
           _selectedPincode = pincodes.first.pincode;
         }
       });
+      _checkFreebieUnlocks();
     } catch (error) {
       if (!mounted) return;
       setState(() => _error = error.toString());
@@ -242,10 +255,57 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// Shows the "freebie unlocked" bottom sheet for whichever freebie
+  /// products just crossed their own threshold and haven't already been
+  /// offered — called after every cart mutation. Never shows a second sheet
+  /// on top of one already open; a product whose threshold is no longer met
+  /// is un-marked so crossing it again later re-triggers the sheet.
+  void _checkFreebieUnlocks() {
+    if (_freebieSheetOpen) return;
+
+    final productsById = _productMap();
+    final subtotal = FreebiePricing.regularSubtotal(cart: _cart, productsById: productsById);
+    final freebieUnitsInCart =
+        FreebiePricing.freebieUnitsInCart(cart: _cart, productsById: productsById);
+    final remainingCap = _maxFreebieQuantityPerOrder - freebieUnitsInCart;
+
+    final eligibleProducts = <Product>[];
+    for (final product in _products) {
+      if (!product.isFreebie) continue;
+      final met = subtotal >= product.freebieMinOrderValue;
+
+      if (!met) {
+        _freebieSheetShownForProductIds.remove(product.id);
+        continue;
+      }
+      if (_freebieSheetShownForProductIds.contains(product.id)) continue;
+
+      final alreadyInCart =
+          _cart.items.any((item) => item.productId == product.id);
+      if (alreadyInCart || remainingCap <= 0) continue;
+
+      eligibleProducts.add(product);
+    }
+    if (eligibleProducts.isEmpty) return;
+
+    for (final product in eligibleProducts) {
+      _freebieSheetShownForProductIds.add(product.id);
+    }
+    _freebieSheetOpen = true;
+    showFreebieUnlockedSheet(
+      context,
+      products: eligibleProducts,
+      maxFreebieQuantityPerOrder: _maxFreebieQuantityPerOrder,
+      alreadyInCartCount: freebieUnitsInCart,
+      onAddToCart: _addToCart,
+    ).whenComplete(() => _freebieSheetOpen = false);
+  }
+
   Future<void> _refreshCart() async {
     final cart = await ApiService.instance.fetchCart();
     if (!mounted) return;
     setState(() => _cart = cart);
+    _checkFreebieUnlocks();
   }
 
   Future<void> _refreshOrders() async {
@@ -376,6 +436,24 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _openOfferProducts(Offer offer) async {
+    if (offer.tag.isEmpty) return;
+    final isServiceable = ApiService.instance
+        .isPincodeServiceable(_selectedPincode, _serviceablePincodes);
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TaggedProductsScreen(
+          tag: offer.tag,
+          title: offer.title,
+          allProducts: _products,
+          onAddToCart: _addToCart,
+          onOpenProduct: _openProduct,
+          isServiceable: isServiceable,
+        ),
+      ),
+    );
+  }
+
   Future<void> _goToCart() async {
     final ok = await _ensureLoggedIn(message: 'Login to view your cart.');
     if (!ok || !mounted) return;
@@ -397,6 +475,7 @@ class _HomeScreenState extends State<HomeScreen> {
           minOrderValueEnabled: _minOrderValueEnabled,
           minOrderValue: _minOrderValue,
           deliveryCharges: _deliveryCharges,
+          maxFreebieQuantityPerOrder: _maxFreebieQuantityPerOrder,
           onAddAddress: _addAddressFromCheckout,
           onOrderPlaced: () async {
             await _refreshCart();
@@ -747,47 +826,53 @@ class _HomeScreenState extends State<HomeScreen> {
           final offer = _offers[index];
           return ClipRRect(
             borderRadius: BorderRadius.circular(14),
-            child: Container(
-              width: 260,
+            child: Material(
               color: Theme.of(context).colorScheme.primaryContainer,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (offer.imageUrl.isNotEmpty)
-                    Image.network(
-                      offer.imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                    ),
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      padding: const EdgeInsets.fromLTRB(12, 20, 12, 10),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.black.withValues(alpha: 0),
-                            Colors.black.withValues(alpha: 0.55),
-                          ],
+              child: InkWell(
+                onTap:
+                    offer.tag.isEmpty ? null : () => _openOfferProducts(offer),
+                child: SizedBox(
+                  width: 260,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      if (offer.imageUrl.isNotEmpty)
+                        Image.network(
+                          offer.imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                        ),
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          padding: const EdgeInsets.fromLTRB(12, 20, 12, 10),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.black.withValues(alpha: 0),
+                                Colors.black.withValues(alpha: 0.55),
+                              ],
+                            ),
+                          ),
+                          child: Text(
+                            offer.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                            ),
+                          ),
                         ),
                       ),
-                      child: Text(
-                        offer.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           );
@@ -996,6 +1081,7 @@ class _HomeScreenState extends State<HomeScreen> {
           minOrderValueEnabled: _minOrderValueEnabled,
           minOrderValue: _minOrderValue,
           deliveryCharges: _deliveryCharges,
+          maxFreebieQuantityPerOrder: _maxFreebieQuantityPerOrder,
           onRefresh: _refreshCart,
           onRemoveItem: _removeCartItem,
           onUpdateQuantity: _updateCartItemQuantity,

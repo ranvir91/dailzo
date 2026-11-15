@@ -16,6 +16,7 @@ class Offer extends Model
     protected $fillable = [
         'title',
         'description',
+        'tag',
         'image',
         'starts_at',
         'expires_at',
